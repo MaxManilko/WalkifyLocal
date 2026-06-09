@@ -156,20 +156,24 @@
 
 @media (max-width: 767.98px) {
   .home-layout {
-    height: 100%; /* Контейнер і так обмежений батьківським .app-page-layer */
+    /* Точний підрахунок: динамічна висота екрану мінус верхній (60px) та нижній (60px) навбари */
+    height: calc(100dvh - 120px) !important;
+    position: relative;
+    overflow: hidden;
   }
 
   .home-sidebar {
-    position: fixed;
-    top: 60px; /* Відступ від верхнього меню */
+    position: absolute; /* Відносно .home-layout, а не екрану */
+    top: 0;
     left: 0;
-    bottom: 60px; /* Відступ для нижнього меню */
+    height: 100%;
     width: 100%;
     max-width: 100%;
     transform: translateX(-100%);
     transition: transform 0.28s ease;
     box-shadow: 4px 0 24px rgba(0, 0, 0, 0.15);
-    padding-bottom: env(safe-area-inset-bottom);
+    z-index: 1050;
+    padding-bottom: 0; /* Прибираємо safe-area, бо dvh вже адаптивний */
   }
 
   .home-sidebar.open {
@@ -177,8 +181,8 @@
   }
 
   .home-sidebar-backdrop {
-    position: fixed;
-    inset: 60px 0 60px 0; /* Точно між двома меню */
+    position: absolute;
+    inset: 0;
     background: rgba(0, 0, 0, 0.4);
     z-index: 1040;
     opacity: 0;
@@ -192,27 +196,34 @@
   }
 
   .home-map-col {
-    position: fixed !important;
-    inset: 60px 0 60px 0 !important; /* Розміщуємо карту точно між верхнім і нижнім меню */
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
     width: 100% !important;
+    height: 100% !important;
     max-width: 100% !important;
     flex: none !important;
   }
 
+  /* Режим вибору точки на карті на весь екран */
   .home-map-col.fullscreen-pick {
+    position: fixed !important;
+    inset: 0 !important;
+    height: 100dvh !important;
     z-index: 1060;
-    inset: 60px 0 60px 0 !important; /* Утримуємо в рамках екрану навіть під час вибору */
-    height: auto !important;
   }
 
   .home-menu-toggle {
     display: flex !important;
+    position: absolute;
+    top: 12px;
+    left: 12px;
   }
 
-  /* Панелі навігації та елементи на карті тепер позиціонуються відносно нового низу карти */
+  /* Кнопки та попапи всередині карти базуються на низу контейнера .home-layout */
   .navigation-panel {
     top: auto !important;
-    bottom: max(16px, env(safe-area-inset-bottom)) !important;
+    bottom: 16px !important;
     left: 8px !important;
     right: 8px !important;
     max-width: none !important;
@@ -220,16 +231,17 @@
 
   .navigation-panel-mini {
     top: auto !important;
-    bottom: max(16px, env(safe-area-inset-bottom)) !important;
+    bottom: 16px !important;
   }
 
   .home-save-btn {
-    bottom: max(24px, env(safe-area-inset-bottom));
+    bottom: 24px;
+    right: 12px;
   }
 
   .home-route-chip {
     top: auto;
-    bottom: max(80px, env(safe-area-inset-bottom));
+    bottom: 80px;
     left: 50%;
     right: auto;
     transform: translateX(-50%);
@@ -238,7 +250,7 @@
   }
 
   .place-info-card {
-    bottom: max(16px, env(safe-area-inset-bottom)) !important;
+    bottom: 16px !important;
     width: calc(100vw - 16px) !important;
   }
 }
