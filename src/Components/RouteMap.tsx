@@ -605,14 +605,38 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
           </>
         )}
 
-        {!pickDestinationMode && (routeSummary || (hasActiveRoute && currentRouteRef.current?.steps)) && (
-          <div className="home-bottom-stack">
-            {routeSummary && (
-              <div className="home-route-chip">
-                <i className="bi bi-signpost-2 me-1 text-success"></i>
-                {routeSummary}
-              </div>
-            )}
+        {!pickDestinationMode && routeSummary && (
+          <div className="home-route-chip">
+            <i className="bi bi-signpost-2 me-1 text-success"></i>
+            {routeSummary}
+          </div>
+        )}
+
+        {!pickDestinationMode && (
+          <div className="home-map-footer">
+            <div className="home-map-actions">
+              {showSaveButton && onSaveRoute && (
+                <button
+                  type="button"
+                  className="home-save-btn"
+                  onClick={onSaveRoute}
+                  title="Зберегти маршрут"
+                  aria-label="Зберегти маршрут"
+                >
+                  <i className="bi bi-bookmark-plus"></i>
+                </button>
+              )}
+              <button
+                type="button"
+                className="home-locate-btn"
+                onClick={centerOnUser}
+                title="Моє місцезнаходження"
+                aria-label="Центрувати на мені"
+              >
+                <i className="bi bi-crosshair"></i>
+              </button>
+            </div>
+
             {hasActiveRoute && currentRouteRef.current?.steps && (
               <NavigationStepsPanel
                 steps={currentRouteRef.current.steps}
@@ -622,31 +646,6 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
                 onStepClick={setCurrentStepIndex}
               />
             )}
-          </div>
-        )}
-
-        {!pickDestinationMode && (
-          <div className="home-map-actions">
-            {showSaveButton && onSaveRoute && (
-              <button
-                type="button"
-                className="home-save-btn"
-                onClick={onSaveRoute}
-                title="Зберегти маршрут"
-                aria-label="Зберегти маршрут"
-              >
-                <i className="bi bi-bookmark-plus"></i>
-              </button>
-            )}
-            <button
-              type="button"
-              className="home-locate-btn"
-              onClick={centerOnUser}
-              title="Моє місцезнаходження"
-              aria-label="Центрувати на мені"
-            >
-              <i className="bi bi-crosshair"></i>
-            </button>
           </div>
         )}
 

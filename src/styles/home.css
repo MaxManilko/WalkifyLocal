@@ -51,11 +51,11 @@
   touch-action: none;
 }
 
-/* Generation overlay — above map content, below app fixed nav (60+60) */
+/* Generation overlay — above all map UI controls */
 .home-generating-overlay {
   position: absolute;
   inset: 0;
-  z-index: 1095;
+  z-index: 1100;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -74,58 +74,53 @@
   color: #198754;
 }
 
-/* Bottom stack: route summary above step navigation */
-.home-bottom-stack {
+/* Floating route summary chip (compact island) */
+.home-route-chip {
   position: absolute;
-  left: 8px;
-  right: 8px;
-  bottom: 72px;
-  z-index: 1100;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: min(52vh, calc(100% - 140px));
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1070;
+  max-width: calc(100% - 80px);
+  width: auto;
+  font-size: 0.75rem;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
 }
 
-.home-bottom-stack > * {
-  pointer-events: auto;
-  flex-shrink: 0;
-}
-
-.home-bottom-stack .navigation-panel-expanded {
-  flex: 1 1 auto;
-  min-height: 0;
-  overflow: hidden;
+/* Footer: buttons above steps navigation */
+.home-map-footer {
+  position: absolute;
+  left: 8px;
+  right: 8px;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  z-index: 1070;
   display: flex;
   flex-direction: column;
+  gap: 10px;
+  align-items: stretch;
+  max-height: min(50vh, calc(100% - 100px));
+  pointer-events: none;
 }
 
-.home-bottom-stack .navigation-panel-expanded .nav-steps-list {
-  flex: 1 1 auto;
-  max-height: 120px;
+.home-map-footer > * {
+  pointer-events: auto;
 }
 
-.home-route-chip {
-  font-size: 0.8rem;
-  padding: 8px 14px;
-  border-radius: 12px;
-  background: rgba(255, 255, 255, 0.97);
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.12);
-  text-align: center;
-  width: 100%;
-}
-
-/* Map action buttons — save + locate side by side */
 .home-map-actions {
-  position: absolute;
-  right: max(12px, env(safe-area-inset-right));
-  bottom: max(16px, env(safe-area-inset-bottom));
-  z-index: 1085;
   display: flex;
   flex-direction: row;
   align-items: center;
+  justify-content: flex-end;
   gap: 8px;
+  flex-shrink: 0;
 }
 
 .home-menu-toggle {
@@ -166,7 +161,6 @@
 
 .home-save-btn,
 .home-locate-btn {
-  position: static;
   width: 48px;
   height: 48px;
   border: none;
@@ -197,6 +191,14 @@
   position: static;
   width: 100%;
   max-width: none;
+  flex-shrink: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.navigation-panel-expanded {
+  display: flex;
+  flex-direction: column;
 }
 
 .navigation-panel-mini {
@@ -272,14 +274,13 @@
     left: 12px;
   }
 
-  .home-bottom-stack {
-    left: 8px;
-    right: 8px;
-    bottom: 72px;
+  .home-route-chip {
+    top: 12px;
+    max-width: calc(100% - 24px);
   }
 
   .place-info-card {
-    bottom: max(88px, calc(env(safe-area-inset-bottom) + 72px)) !important;
+    bottom: max(100px, calc(env(safe-area-inset-bottom) + 88px)) !important;
     width: calc(100% - 16px) !important;
     left: 8px !important;
     right: 8px !important;
@@ -301,15 +302,17 @@
     z-index: 1060;
   }
 
-  .home-bottom-stack {
+  .home-map-footer {
     left: 12px;
     right: auto;
     max-width: 420px;
     bottom: 16px;
   }
 
-  .home-map-actions {
-    bottom: 16px;
+  .home-route-chip {
+    left: auto;
     right: 12px;
+    transform: none;
+    top: 12px;
   }
 }
