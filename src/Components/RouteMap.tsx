@@ -21,7 +21,7 @@ import {
 } from "../utils/walkProgressStorage";
 import { syncPendingWalkStatistics } from "../services/walkStatisticSync";
 import PlaceInfoCard from "./PlaceInfoCard";
-import NavigationStepsPanel from "./NavigationStepsPanel";
+import NavigationStepsPanel, { NavigationStepsMini } from "./NavigationStepsPanel";
 import RouteCompletionCelebration from "./RouteCompletionCelebration";
 
 export interface WalkPreferences {
@@ -153,6 +153,7 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
       durationSeconds: number;
     } | null>(null);
     const [hasActiveRoute, setHasActiveRoute] = useState(false);
+    const [navExpanded, setNavExpanded] = useState(true);
     const [showRouteCompletion, setShowRouteCompletion] = useState(false);
     const currentRouteRef = useRef<RouteResult | null>(null);
     const routeCompletedRef = useRef(false);
@@ -367,6 +368,7 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
       setCurrentStepIndex(0);
       setCurrentStepRemaining(null);
       setHasActiveRoute(false);
+      setNavExpanded(true);
       currentRouteRef.current = null;
       maxProgressIndexRef.current = 0;
       maxTraveledKmRef.current = 0;
@@ -408,6 +410,7 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
         console.error('[Walkify] Синхронізація попередньої прогулянки:', err)
       );
       setHasActiveRoute(true);
+      setNavExpanded(true);
       setCurrentStepIndex(0);
       setCurrentStepRemaining(null);
 
@@ -615,12 +618,12 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
         )}
 
         {!pickDestinationMode && !hideMapControls && (
-          <div className="home-map-footer">
+          <div className={`home-map-footer ${!navExpanded ? 'is-compact' : ''}`}>
             <div className="home-map-actions">
               {showSaveButton && onSaveRoute && (
                 <button
                   type="button"
-                  className="home-save-btn"
+                  className="home-save-btn home-toolbar-btn"
                   onClick={onSaveRoute}
                   title="Зберегти маршрут"
                   aria-label="Зберегти маршрут"
@@ -630,22 +633,30 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
               )}
               <button
                 type="button"
-                className="home-locate-btn"
+                className="home-locate-btn home-toolbar-btn"
                 onClick={centerOnUser}
                 title="Моє місцезнаходження"
                 aria-label="Центрувати на мені"
               >
                 <i className="bi bi-crosshair"></i>
               </button>
+              {hasActiveRoute && currentRouteRef.current?.steps && !navExpanded && (
+                <NavigationStepsMini
+                  currentStepIndex={currentStepIndex}
+                  totalSteps={currentRouteRef.current.steps.length}
+                  onExpand={() => setNavExpanded(true)}
+                />
+              )}
             </div>
 
-            {hasActiveRoute && currentRouteRef.current?.steps && (
+            {hasActiveRoute && currentRouteRef.current?.steps && navExpanded && (
               <NavigationStepsPanel
                 steps={currentRouteRef.current.steps}
                 currentStepIndex={currentStepIndex}
                 remainingDistanceMeters={currentStepRemaining?.distanceMeters}
                 remainingDurationSeconds={currentStepRemaining?.durationSeconds}
                 onStepClick={setCurrentStepIndex}
+                onCollapse={() => setNavExpanded(false)}
               />
             )}
           </div>

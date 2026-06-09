@@ -1,5 +1,31 @@
-import React, { useState } from "react";
+import React from "react";
 import { RouteStep } from "../services/routeService";
+
+interface NavigationStepsMiniProps {
+  currentStepIndex: number;
+  totalSteps: number;
+  onExpand: () => void;
+}
+
+export function NavigationStepsMini({
+  currentStepIndex,
+  totalSteps,
+  onExpand,
+}: NavigationStepsMiniProps) {
+  return (
+    <button
+      type="button"
+      className="navigation-panel-mini home-toolbar-btn"
+      onClick={onExpand}
+      title="Покрокова навігація"
+    >
+      <i className="bi bi-signpost-split"></i>
+      <span className="navigation-panel-mini-label">
+        {Math.min(currentStepIndex + 1, totalSteps)}/{totalSteps}
+      </span>
+    </button>
+  );
+}
 
 interface NavigationStepsPanelProps {
   steps: RouteStep[];
@@ -7,6 +33,7 @@ interface NavigationStepsPanelProps {
   remainingDistanceMeters?: number;
   remainingDurationSeconds?: number;
   onStepClick?: (index: number) => void;
+  onCollapse?: () => void;
 }
 
 const MANEUVER_ICON: Record<string, string> = {
@@ -27,9 +54,8 @@ const NavigationStepsPanel: React.FC<NavigationStepsPanelProps> = ({
   remainingDistanceMeters,
   remainingDurationSeconds,
   onStepClick,
+  onCollapse,
 }) => {
-  const [expanded, setExpanded] = useState(true);
-
   if (steps.length === 0) return null;
 
   const current = steps[Math.min(currentStepIndex, steps.length - 1)];
@@ -40,19 +66,6 @@ const NavigationStepsPanel: React.FC<NavigationStepsPanelProps> = ({
   const displayDuration = showRemaining
     ? (remainingDurationSeconds ?? 0)
     : current.durationSeconds;
-
-  if (!expanded) {
-    return (
-      <button
-        type="button"
-        className="navigation-panel navigation-panel-mini btn btn-success shadow rounded-pill px-3 py-2 small fw-semibold"
-        onClick={() => setExpanded(true)}
-      >
-        <i className="bi bi-signpost-split me-1"></i>
-        Крок {Math.min(currentStepIndex + 1, steps.length)}/{steps.length}
-      </button>
-    );
-  }
 
   return (
     <div className="navigation-panel navigation-panel-expanded shadow-lg border-0 rounded-4 overflow-hidden bg-white">
@@ -65,7 +78,7 @@ const NavigationStepsPanel: React.FC<NavigationStepsPanelProps> = ({
         <button
           type="button"
           className="btn btn-sm btn-link text-white p-0 ms-1"
-          onClick={() => setExpanded(false)}
+          onClick={onCollapse}
           aria-label="Згорнути"
         >
           <i className="bi bi-chevron-down"></i>
