@@ -319,6 +319,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
             routeSummary={!sidebarOpen && !isPickingOnMap ? routeSummary : undefined}
             showSaveButton={hasRoute && !isPickingOnMap}
             onSaveRoute={handleOpenSaveModal}
+            hideMapControls={sidebarOpen || isGenerating || isPickingOnMap}
             pickDestinationMode={isPickingOnMap}
             onDestinationPicked={handleDestinationPicked}
             onPickCancel={handlePickCancel}

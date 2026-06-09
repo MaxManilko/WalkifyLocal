@@ -59,6 +59,7 @@ interface RouteMapProps {
   routeSummary?: string;
   showSaveButton?: boolean;
   onSaveRoute?: () => void;
+  hideMapControls?: boolean;
 }
 
 const TYPE_COLOR_MAP: Record<string, string> = {
@@ -130,6 +131,7 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
     routeSummary,
     showSaveButton,
     onSaveRoute,
+    hideMapControls = false,
   }, ref) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<google.maps.Map | null>(null);
@@ -605,14 +607,14 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
           </>
         )}
 
-        {!pickDestinationMode && routeSummary && (
+        {!pickDestinationMode && !hideMapControls && routeSummary && (
           <div className="home-route-chip">
             <i className="bi bi-signpost-2 me-1 text-success"></i>
             {routeSummary}
           </div>
         )}
 
-        {!pickDestinationMode && (
+        {!pickDestinationMode && !hideMapControls && (
           <div className="home-map-footer">
             <div className="home-map-actions">
               {showSaveButton && onSaveRoute && (
