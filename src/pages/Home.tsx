@@ -225,6 +225,19 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
         <div
           className={`col-12 col-md-4 p-2 p-md-3 bg-light border-end overflow-y-auto home-sidebar ${sidebarOpen ? 'open' : ''} ${isPickingOnMap ? 'd-none' : ''}`}
         >
+          {/* Шапка сайдбару з кнопкою закриття для мобільних пристроїв */}
+          <div className="d-flex justify-content-between align-items-center mb-3 d-md-none px-1">
+            <h6 className="m-0 fw-bold text-success">
+              <i className="bi bi-sliders me-2"></i>Параметри прогулянки
+            </h6>
+            <button 
+              type="button" 
+              className="btn-close" 
+              aria-label="Закрити" 
+              onClick={() => setSidebarOpen(false)}>
+            </button>
+          </div>
+
           <ul className="nav nav-pills nav-fill mb-2 mb-md-3 bg-white p-1 rounded-3 border">
             <li className="nav-item">
               <button
@@ -285,11 +298,11 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
           {!isPickingOnMap && (
             <button
               type="button"
-              className="home-menu-toggle"
+              className={`home-menu-toggle ${sidebarOpen ? 'd-none' : ''}`}
               onClick={() => setSidebarOpen(prev => !prev)}
               aria-label="Меню параметрів"
             >
-              <i className={`bi ${sidebarOpen ? 'bi-x-lg' : 'bi-list'}`}></i>
+              <i className="bi bi-list"></i>
             </button>
           )}
 

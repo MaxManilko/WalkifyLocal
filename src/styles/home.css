@@ -156,15 +156,14 @@
 
 @media (max-width: 767.98px) {
   .home-layout {
-    height: calc(100vh - 56px);
-    height: calc(100dvh - 56px);
+    height: 100%; /* Контейнер і так обмежений батьківським .app-page-layer */
   }
 
   .home-sidebar {
     position: fixed;
-    top: 56px;
+    top: 60px; /* Відступ від верхнього меню */
     left: 0;
-    bottom: 0;
+    bottom: 60px; /* Відступ для нижнього меню */
     width: 100%;
     max-width: 100%;
     transform: translateX(-100%);
@@ -179,7 +178,7 @@
 
   .home-sidebar-backdrop {
     position: fixed;
-    inset: 56px 0 0 0;
+    inset: 60px 0 60px 0; /* Точно між двома меню */
     background: rgba(0, 0, 0, 0.4);
     z-index: 1040;
     opacity: 0;
@@ -194,7 +193,7 @@
 
   .home-map-col {
     position: fixed !important;
-    inset: 56px 0 0 0;
+    inset: 60px 0 60px 0 !important; /* Розміщуємо карту точно між верхнім і нижнім меню */
     width: 100% !important;
     max-width: 100% !important;
     flex: none !important;
@@ -202,17 +201,18 @@
 
   .home-map-col.fullscreen-pick {
     z-index: 1060;
-    inset: 0 !important;
-    height: 100dvh !important;
+    inset: 60px 0 60px 0 !important; /* Утримуємо в рамках екрану навіть під час вибору */
+    height: auto !important;
   }
 
   .home-menu-toggle {
     display: flex !important;
   }
 
+  /* Панелі навігації та елементи на карті тепер позиціонуються відносно нового низу карти */
   .navigation-panel {
     top: auto !important;
-    bottom: max(80px, calc(env(safe-area-inset-bottom) + 64px)) !important;
+    bottom: max(16px, env(safe-area-inset-bottom)) !important;
     left: 8px !important;
     right: 8px !important;
     max-width: none !important;
@@ -220,16 +220,16 @@
 
   .navigation-panel-mini {
     top: auto !important;
-    bottom: max(80px, calc(env(safe-area-inset-bottom) + 64px)) !important;
+    bottom: max(16px, env(safe-area-inset-bottom)) !important;
   }
 
   .home-save-btn {
-    bottom: max(96px, calc(env(safe-area-inset-bottom) + 80px));
+    bottom: max(24px, env(safe-area-inset-bottom));
   }
 
   .home-route-chip {
     top: auto;
-    bottom: max(152px, calc(env(safe-area-inset-bottom) + 132px));
+    bottom: max(80px, env(safe-area-inset-bottom));
     left: 50%;
     right: auto;
     transform: translateX(-50%);
