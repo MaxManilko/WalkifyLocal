@@ -521,7 +521,7 @@ function Favorites() {
               onClick={() => setActiveTab("myRoutes")}
             >
               <i className="bi bi-bookmark me-2"></i>
-              Мої маршрути ({myRoutes.length})
+              Мої маршрути 
             </Nav.Link>
           </Nav.Item>
         )}
@@ -531,7 +531,7 @@ function Favorites() {
             onClick={() => setActiveTab("favorites")}
           >
             <i className="bi bi-heart me-2"></i>
-            Улюблені ({favoriteRoutes.length})
+            Улюблені 
           </Nav.Link>
         </Nav.Item>
         <Nav.Item>
@@ -540,7 +540,7 @@ function Favorites() {
             onClick={() => setActiveTab("public")}
           >
             <i className="bi bi-globe me-2"></i>
-            Публічні ({publicRoutes.length})
+            Публічні 
           </Nav.Link>
         </Nav.Item>
         {user && (
@@ -550,7 +550,7 @@ function Favorites() {
               onClick={() => setActiveTab("myPublished")}
             >
               <i className="bi bi-cloud-check me-2"></i>
-              Мої опубліковані ({myPublishedRoutes.length})
+              Мої опубліковані 
             </Nav.Link>
           </Nav.Item>
         )}

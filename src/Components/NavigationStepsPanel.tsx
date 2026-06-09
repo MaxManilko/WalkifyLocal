@@ -45,7 +45,7 @@ const NavigationStepsPanel: React.FC<NavigationStepsPanelProps> = ({
     return (
       <button
         type="button"
-        className="navigation-panel-mini btn btn-success shadow rounded-pill px-3 py-2 small fw-semibold"
+        className="navigation-panel navigation-panel-mini btn btn-success shadow rounded-pill px-3 py-2 small fw-semibold"
         onClick={() => setExpanded(true)}
       >
         <i className="bi bi-signpost-split me-1"></i>
@@ -55,7 +55,7 @@ const NavigationStepsPanel: React.FC<NavigationStepsPanelProps> = ({
   }
 
   return (
-    <div className="navigation-panel shadow-lg border-0 rounded-4 overflow-hidden bg-white">
+    <div className="navigation-panel navigation-panel-expanded shadow-lg border-0 rounded-4 overflow-hidden bg-white">
       <div className="bg-success text-white px-3 py-2 small fw-semibold d-flex align-items-center gap-2">
         <i className="bi bi-signpost-split"></i>
         <span className="text-truncate">Покрокова навігація</span>

@@ -216,6 +216,13 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
 
   return (
     <div className="container-fluid p-0 position-relative home-layout">
+      {isGenerating && (
+        <div className="home-generating-overlay" role="status" aria-live="polite">
+          <div className="spinner-border text-success" style={{ width: '2.5rem', height: '2.5rem' }} />
+          <p>Будуємо маршрут...</p>
+        </div>
+      )}
+
       <div
         className={`home-sidebar-backdrop ${sidebarOpen && !isPickingOnMap ? 'visible' : ''}`}
         onClick={() => setSidebarOpen(false)}
@@ -283,16 +290,6 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
             </div>
           )}
 
-          {hasRoute && (
-            <Button
-              variant="success"
-              className="w-100 rounded-3 shadow-sm"
-              onClick={handleOpenSaveModal}
-            >
-              <i className="bi bi-bookmark-plus me-2"></i>
-              Зберегти маршрут
-            </Button>
-          )}
         </div>
 
         <div className={`col-12 col-md-8 position-relative h-100 home-map-col ${isPickingOnMap ? 'fullscreen-pick' : ''}`}>
@@ -316,28 +313,12 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
             </button>
           )}
 
-          {routeSummary && !sidebarOpen && !isPickingOnMap && (
-            <div className="home-route-chip">
-              <i className="bi bi-signpost-2 me-1 text-success"></i>
-              {routeSummary}
-            </div>
-          )}
-
-          {hasRoute && !isPickingOnMap && (
-            <button
-              type="button"
-              className="home-save-btn"
-              onClick={handleOpenSaveModal}
-              title="Зберегти маршрут"
-              aria-label="Зберегти маршрут"
-            >
-              <i className="bi bi-bookmark-plus"></i>
-            </button>
-          )}
-
           <RouteMap
             ref={mapRef}
             onRouteSummary={handleRouteSummary}
+            routeSummary={!sidebarOpen && !isPickingOnMap ? routeSummary : undefined}
+            showSaveButton={hasRoute && !isPickingOnMap}
+            onSaveRoute={handleOpenSaveModal}
             pickDestinationMode={isPickingOnMap}
             onDestinationPicked={handleDestinationPicked}
             onPickCancel={handlePickCancel}

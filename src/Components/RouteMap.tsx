@@ -56,6 +56,9 @@ interface RouteMapProps {
   pickDestinationMode?: boolean;
   onDestinationPicked?: (coords: [number, number], address: string) => void;
   onPickCancel?: () => void;
+  routeSummary?: string;
+  showSaveButton?: boolean;
+  onSaveRoute?: () => void;
 }
 
 const TYPE_COLOR_MAP: Record<string, string> = {
@@ -118,7 +121,16 @@ function getCompassHeading(event: DeviceOrientationEvent): number | null {
 }
 
 const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
-  ({ onRouteSummary, onRouteGenerated, pickDestinationMode, onDestinationPicked, onPickCancel }, ref) => {
+  ({
+    onRouteSummary,
+    onRouteGenerated,
+    pickDestinationMode,
+    onDestinationPicked,
+    onPickCancel,
+    routeSummary,
+    showSaveButton,
+    onSaveRoute,
+  }, ref) => {
     const mapContainerRef = useRef<HTMLDivElement>(null);
     const mapRef = useRef<google.maps.Map | null>(null);
     const traveledLineRef = useRef<google.maps.Polyline | null>(null);
@@ -255,7 +267,7 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
         maxTraveledKmRef.current,
         totalRouteKm
       );
-      onRouteSummaryRef.current?.(formatRemainingRouteSummary(stats, route.difficulty));
+      onRouteSummaryRef.current?.(formatRemainingRouteSummary(stats));
 
       updateWalkProgressTraveledKm(maxTraveledKmRef.current, totalRouteKm);
 
@@ -452,7 +464,7 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
         updateRouteProgress(userLocationRef.current);
       } else {
         const initialStats = calculateRemainingRouteStats(route, 0, 0);
-        onRouteSummaryRef.current?.(formatRemainingRouteSummary(initialStats, route.difficulty));
+        onRouteSummaryRef.current?.(formatRemainingRouteSummary(initialStats));
       }
     }, [clearRouteLines, updateRouteProgress]);
 
@@ -593,25 +605,50 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
           </>
         )}
 
-        {!pickDestinationMode && hasActiveRoute && currentRouteRef.current?.steps && (
-          <NavigationStepsPanel
-            steps={currentRouteRef.current.steps}
-            currentStepIndex={currentStepIndex}
-            remainingDistanceMeters={currentStepRemaining?.distanceMeters}
-            remainingDurationSeconds={currentStepRemaining?.durationSeconds}
-            onStepClick={setCurrentStepIndex}
-          />
+        {!pickDestinationMode && (routeSummary || (hasActiveRoute && currentRouteRef.current?.steps)) && (
+          <div className="home-bottom-stack">
+            {routeSummary && (
+              <div className="home-route-chip">
+                <i className="bi bi-signpost-2 me-1 text-success"></i>
+                {routeSummary}
+              </div>
+            )}
+            {hasActiveRoute && currentRouteRef.current?.steps && (
+              <NavigationStepsPanel
+                steps={currentRouteRef.current.steps}
+                currentStepIndex={currentStepIndex}
+                remainingDistanceMeters={currentStepRemaining?.distanceMeters}
+                remainingDurationSeconds={currentStepRemaining?.durationSeconds}
+                onStepClick={setCurrentStepIndex}
+              />
+            )}
+          </div>
         )}
 
-        <button
-          type="button"
-          className="home-locate-btn"
-          onClick={centerOnUser}
-          title="Моє місцезнаходження"
-          aria-label="Центрувати на мені"
-        >
-          <i className="bi bi-crosshair"></i>
-        </button>
+        {!pickDestinationMode && (
+          <div className="home-map-actions">
+            {showSaveButton && onSaveRoute && (
+              <button
+                type="button"
+                className="home-save-btn"
+                onClick={onSaveRoute}
+                title="Зберегти маршрут"
+                aria-label="Зберегти маршрут"
+              >
+                <i className="bi bi-bookmark-plus"></i>
+              </button>
+            )}
+            <button
+              type="button"
+              className="home-locate-btn"
+              onClick={centerOnUser}
+              title="Моє місцезнаходження"
+              aria-label="Центрувати на мені"
+            >
+              <i className="bi bi-crosshair"></i>
+            </button>
+          </div>
+        )}
 
         {selectedPoi && !pickDestinationMode && (
           <PlaceInfoCard

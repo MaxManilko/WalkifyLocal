@@ -74,15 +74,11 @@ export function calculateRemainingRouteStats(
   };
 }
 
-export function formatRemainingRouteSummary(
-  stats: RouteProgressStats,
-  difficulty?: string
-): string {
-  const diffStr = difficulty ? ` · ${difficulty}` : '';
+export function formatRemainingRouteSummary(stats: RouteProgressStats): string {
   if (stats.remainingDistanceKm < 0.05) {
-    return `Майже на місці${diffStr}`;
+    return 'Майже на місці';
   }
-  return `${stats.remainingDistanceKm} км · ~${stats.remainingTimeMinutes} хв залишилось${diffStr}`;
+  return `${stats.remainingDistanceKm} км · ~${stats.remainingTimeMinutes} хв залишилось`;
 }
 
 export interface RouteProgressPosition {
