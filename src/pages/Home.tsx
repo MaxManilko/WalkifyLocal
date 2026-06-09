@@ -26,6 +26,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
   const [destination, setDestination] = useState<RouteDestination | null>(null);
   const [isPickingOnMap, setIsPickingOnMap] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [hasOpenedMenu, setHasOpenedMenu] = useState(false); // Стан для відслідковування першого відкриття
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [saveDescription, setSaveDescription] = useState("");
@@ -295,14 +296,23 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
         </div>
 
         <div className={`col-12 col-md-8 position-relative h-100 home-map-col ${isPickingOnMap ? 'fullscreen-pick' : ''}`}>
+          {/* Нова динамічна кнопка відкриття меню */}
           {!isPickingOnMap && (
             <button
               type="button"
-              className={`home-menu-toggle ${sidebarOpen ? 'd-none' : ''}`}
-              onClick={() => setSidebarOpen(prev => !prev)}
+              className={`home-menu-toggle shadow-sm ${sidebarOpen ? 'd-none' : ''} ${!hasOpenedMenu ? 'with-text' : 'icon-only'}`}
+              onClick={() => {
+                setSidebarOpen(prev => !prev);
+                if (!hasOpenedMenu) setHasOpenedMenu(true);
+              }}
               aria-label="Меню параметрів"
             >
-              <i className="bi bi-list"></i>
+              <i className="bi bi-signpost-2-fill"></i>
+              {!hasOpenedMenu && (
+                <span className="ms-2 fs-6 fw-semibold text-dark text-nowrap">
+                  Згенерувати прогулянку
+                </span>
+              )}
             </button>
           )}
 

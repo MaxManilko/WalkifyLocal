@@ -305,7 +305,7 @@ const RouteMap = forwardRef<RouteMapRef, RouteMapProps>(
         center: { lat: 50.4501, lng: 30.5234 },
         zoom: 13,
         disableDefaultUI: true,
-        zoomControl: true,
+        zoomControl: false, // Відключаємо кнопки зуму +/-
         clickableIcons: false,
         gestureHandling: 'greedy',
       });

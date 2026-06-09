@@ -65,22 +65,34 @@
   pointer-events: none;
 }
 
+/* Base styles for dynamic menu toggle button */
 .home-menu-toggle {
   display: none;
   position: absolute;
   top: max(12px, env(safe-area-inset-top));
   left: max(12px, env(safe-area-inset-left));
   z-index: 1080;
-  width: 48px;
   height: 48px;
   border: none;
-  border-radius: 50%;
   background: #fff;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.2);
   align-items: center;
   justify-content: center;
   font-size: 1.25rem;
   color: #198754;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.home-menu-toggle.icon-only {
+  width: 48px;
+  border-radius: 50%;
+  padding: 0;
+}
+
+.home-menu-toggle.with-text {
+  width: auto;
+  border-radius: 24px;
+  padding: 0 20px;
 }
 
 .home-pick-cancel {
