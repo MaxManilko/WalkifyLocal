@@ -75,33 +75,30 @@ function Chat() {
   const [userSearchResults, setUserSearchResults] = useState<UserProfile[]>([]);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
   
-  // Початкова висота
-  const [chatHeight, setChatHeight] = useState("100%");
+  // Початкова висота (з відступом для шапки і підвалу)
+  const [chatHeight, setChatHeight] = useState("calc(100vh - 120px)");
 
-  // Розумний підрахунок висоти екрану (враховуючи мобільну навігацію)
+  // Розумний підрахунок висоти екрану
   useEffect(() => {
     const updateHeight = () => {
       if (containerRef.current) {
-        // Визначаємо відступ зверху (шапка додатку)
+        // Відступ зверху
         const topOffset = Math.max(containerRef.current.getBoundingClientRect().top, 0);
         
-        // Визначаємо висоту нижньої навігації (якщо вона є)
+        // Визначаємо висоту нижньої навігації
         let bottomOffset = 0;
         const navElements = document.querySelectorAll('nav, .bottom-nav, .fixed-bottom');
         
         navElements.forEach(nav => {
           const rect = nav.getBoundingClientRect();
-          // Якщо елемент знаходиться в самому низу вікна - це наша навігація
           if (rect.bottom >= window.innerHeight - 10 && rect.top > window.innerHeight / 2) {
             bottomOffset = rect.height;
           }
         });
 
-        // Реальна висота вікна (виправляє баг 100vh на Safari/Chrome mobile)
         const realWindowHeight = window.innerHeight;
-        
-        // Точна висота чату = весь екран мінус шапка мінус нижня навігація
-        const exactHeight = realWindowHeight - topOffset - bottomOffset;
+        // Віднімаємо відступ зверху, висоту навігації та 16px відступу знизу, щоб картка не прилипала
+        const exactHeight = realWindowHeight - topOffset - bottomOffset - 16;
         setChatHeight(`${exactHeight}px`);
       }
     };
@@ -453,391 +450,383 @@ function Chat() {
   }
 
   return (
-    <Container 
-      fluid 
-      className="chat-page p-0" 
-      ref={containerRef}
-      style={{ height: chatHeight, overflow: "hidden" }}
-    >
-      <Row className="g-0 h-100 chat-layout-row">
-        {/* Conversation list (Sidebar) */}
-        <Col
-          xs={12}
-          md={4}
-          lg={3}
-          className={`border-end bg-light chat-sidebar flex-column h-100 ${
-            activeConversation ? "d-none d-md-flex" : "d-flex"
-          }`}
-        >
-          {/* Фіксована шапка сайдбару */}
-          <div className="p-3 border-bottom bg-white flex-shrink-0">
-            <h5 className="mb-3">
-              <i className="bi bi-chat-dots me-2"></i>
-              Повідомлення
-            </h5>
-            <Form onSubmit={handleUserSearch} className="chat-search-form">
-              <div className="d-flex gap-2">
-                <Form.Control
-                  type="search"
-                  size="sm"
-                  placeholder="Пошук користувачів..."
-                  value={userSearchQuery}
-                  onChange={(e) => setUserSearchQuery(e.target.value)}
-                />
-                <Button
-                  type="submit"
-                  variant="success"
-                  size="sm"
-                  disabled={userSearchLoading}
-                >
-                  {userSearchLoading ? (
-                    <Spinner animation="border" size="sm" />
-                  ) : (
-                    <i className="bi bi-search"></i>
-                  )}
-                </Button>
-              </div>
-            </Form>
-            {userSearchResults.length > 0 && (
-              <ListGroup variant="flush" className="chat-search-results mt-2 border rounded">
-                {userSearchResults.map((result) => (
-                  <ListGroup.Item
-                    key={result.id}
-                    action
-                    className="d-flex align-items-center gap-2 py-2"
-                    onClick={() => handleStartChatWithUser(result.id)}
-                  >
-                    <img
-                      src={result.avatar_url || userAvatar}
-                      alt=""
-                      className="rounded-circle flex-shrink-0"
-                      style={{ width: 32, height: 32, objectFit: "cover" }}
-                    />
-                    <div className="min-width-0">
-                      <div className="fw-semibold text-truncate small">
-                        {result.full_name || "Користувач"}
-                      </div>
-                      <small className="text-muted text-truncate d-block">
-                        {result.email}
-                      </small>
-                    </div>
-                  </ListGroup.Item>
-                ))}
-              </ListGroup>
-            )}
-          </div>
-
-          {/* Список чатів з прокруткою */}
-          <div className="flex-grow-1 overflow-y-auto">
-            {loading ? (
-              <div className="text-center py-5">
-                <Spinner animation="border" variant="success" />
-                <p className="mt-2 text-muted">Loading conversations...</p>
-              </div>
-            ) : error ? (
-              <Alert variant="danger" className="m-3">
-                {error}
-              </Alert>
-            ) : conversations.length === 0 ? (
-              <div className="p-4 text-center text-muted">
-                <i className="bi bi-chat fs-1"></i>
-                <p className="mt-2 mb-0">No conversations yet</p>
-                <small>Search for users and start a chat from their profile</small>
-              </div>
-            ) : (
-              <ListGroup variant="flush">
-                {conversations.map((conv) => {
-                  const isActive = activeConversation?.id === conv.id;
-                  return (
-                    <ListGroup.Item
-                      key={conv.id}
-                      action
-                      onClick={() => handleSelectConversation(conv)}
-                      className={`d-flex align-items-center py-3 border-0 border-bottom rounded-0 chat-conversation-item ${
-                        isActive ? "chat-conversation-item--active" : ""
-                      }`}
-                    >
-                      <img
-                        src={conv.other_user?.avatar_url || userAvatar}
-                        alt=""
-                        className="rounded-circle me-3"
-                        style={{ width: 48, height: 48, objectFit: "cover" }}
-                      />
-                      <div className="flex-grow-1 overflow-hidden">
-                        <div className="d-flex justify-content-between align-items-start">
-                          <span className="fw-semibold text-truncate">
-                            {conv.other_user?.full_name || "Unknown"}
-                          </span>
-                          {conv.last_message && (
-                            <small className="text-muted ms-2 flex-shrink-0">
-                              {formatTime(conv.last_message.created_at)}
-                            </small>
-                          )}
-                        </div>
-                        <small className="text-muted text-truncate d-block">
-                          {formatLastMessage(conv.last_message)}
-                        </small>
-                      </div>
-                    </ListGroup.Item>
-                  );
-                })}
-              </ListGroup>
-            )}
-          </div>
-        </Col>
-
-        {/* Chat area */}
-        <Col
-          xs={12}
-          md={8}
-          lg={9}
-          className={`bg-white chat-main h-100 flex-column ${
-            !activeConversation ? "d-none d-md-flex" : "d-flex"
-          }`}
-        >
-          {activeConversation ? (
-            <>
-              {/* Фіксована шапка чату */}
-              <div className="p-3 border-bottom chat-header flex-shrink-0 d-flex align-items-center justify-content-between">
-                <div className="d-flex align-items-center">
-                  <Button
-                    variant="link"
-                    className="d-md-none p-0 text-success flex-shrink-0 me-2"
-                    onClick={() => {
-                      setActiveConversation(null);
-                      navigate("/chat");
-                    }}
-                    aria-label="Назад до списку"
-                  >
-                    <i className="bi bi-arrow-left fs-5"></i>
-                  </Button>
-                  <img
-                    src={activeConversation.other_user?.avatar_url || userAvatar}
-                    alt=""
-                    className="rounded-circle flex-shrink-0 me-3"
-                    style={{ width: 40, height: 40, objectFit: "cover" }}
-                  />
-                  <div className="chat-header-info">
-                    <h5 className="mb-0">
-                      {activeConversation.other_user?.full_name || "Unknown"}
-                    </h5>
-                    {isChatBlocked && (
-                      <small className="text-muted d-block">
-                        {isBlockedByMe
-                          ? "Користувача заблоковано"
-                          : "Повідомлення недоступні"}
-                      </small>
-                    )}
-                  </div>
-                </div>
-                
-                <div className="chat-header-actions">
-                  {activeConversation.other_user?.id && (
-                    <Button
-                      variant={isBlockedByMe ? "outline-secondary" : "outline-danger"}
+    // Звичайний Container (не fluid), щоб були відступи. 
+    // py-2/py-md-3 додає відстань зверху і знизу.
+    <Container className="chat-page py-2 py-md-3">
+      <div ref={containerRef}>
+        {/* Обгортка-картка з фіксованою висотою, яка гарантовано не залізе під навігацію */}
+        <Card className="border-0 shadow-sm overflow-hidden" style={{ height: chatHeight }}>
+          <Row className="g-0 h-100 chat-layout-row">
+            {/* Conversation list (Sidebar) */}
+            <Col
+              xs={12}
+              md={4}
+              lg={4}
+              className={`border-end bg-light chat-sidebar flex-column h-100 ${
+                activeConversation ? "d-none d-md-flex" : "d-flex"
+              }`}
+            >
+              <div className="p-3 border-bottom bg-white flex-shrink-0">
+                <h5 className="mb-3">
+                  <i className="bi bi-chat-dots me-2 text-success"></i>
+                  Повідомлення
+                </h5>
+                <Form onSubmit={handleUserSearch} className="chat-search-form">
+                  <div className="d-flex gap-2">
+                    <Form.Control
+                      type="search"
                       size="sm"
-                      className="me-2"
-                      onClick={handleToggleBlock}
-                      disabled={blockLoading}
+                      placeholder="Пошук користувачів..."
+                      value={userSearchQuery}
+                      onChange={(e) => setUserSearchQuery(e.target.value)}
+                    />
+                    <Button
+                      type="submit"
+                      variant="success"
+                      size="sm"
+                      disabled={userSearchLoading}
                     >
-                      {blockLoading ? (
+                      {userSearchLoading ? (
                         <Spinner animation="border" size="sm" />
-                      ) : isBlockedByMe ? (
-                        "Розблокувати"
                       ) : (
-                        "Заблокувати"
+                        <i className="bi bi-search"></i>
                       )}
                     </Button>
-                  )}
-                  {notificationPermission === "default" && (
-                    <Button
-                      variant="outline-success"
-                      size="sm"
-                      onClick={handleEnableNotifications}
-                    >
-                      Сповіщення
-                    </Button>
-                  )}
-                </div>
+                  </div>
+                </Form>
+                {userSearchResults.length > 0 && (
+                  <ListGroup variant="flush" className="chat-search-results mt-2 border rounded">
+                    {userSearchResults.map((result) => (
+                      <ListGroup.Item
+                        key={result.id}
+                        action
+                        className="d-flex align-items-center gap-2 py-2"
+                        onClick={() => handleStartChatWithUser(result.id)}
+                      >
+                        <img
+                          src={result.avatar_url || userAvatar}
+                          alt=""
+                          className="rounded-circle flex-shrink-0"
+                          style={{ width: 32, height: 32, objectFit: "cover" }}
+                        />
+                        <div className="min-width-0">
+                          <div className="fw-semibold text-truncate small">
+                            {result.full_name || "Користувач"}
+                          </div>
+                          <small className="text-muted text-truncate d-block">
+                            {result.email}
+                          </small>
+                        </div>
+                      </ListGroup.Item>
+                    ))}
+                  </ListGroup>
+                )}
               </div>
 
-              {/* Messages area з прокруткою */}
-              <div className="chat-messages p-3 flex-grow-1 overflow-y-auto">
-                {messages.map((msg) => {
-                  const isOwn = msg.sender_id === user.id;
-                  let routeShare: RouteShareMessagePayload | null = null;
-                  try {
-                    const parsed = JSON.parse(msg.content) as RouteShareMessagePayload;
-                    if (parsed && parsed.type === "route_share") {
-                      routeShare = parsed;
-                    }
-                  } catch {
-                    routeShare = null;
-                  }
-                  return (
-                    <div
-                      key={msg.id}
-                      className={`d-flex mb-3 ${isOwn ? "justify-content-end" : "justify-content-start"}`}
-                    >
-                      <div
-                        className={`rounded-3 px-3 py-2 shadow-sm ${
-                          isOwn
-                            ? "bg-success text-white"
-                            : "bg-light text-dark"
-                        }`}
-                        style={{ maxWidth: "75%" }}
+              {/* Список чатів з прокруткою */}
+              <div className="flex-grow-1 overflow-y-auto">
+                {loading ? (
+                  <div className="text-center py-5">
+                    <Spinner animation="border" variant="success" />
+                    <p className="mt-2 text-muted">Завантаження...</p>
+                  </div>
+                ) : error ? (
+                  <Alert variant="danger" className="m-3">
+                    {error}
+                  </Alert>
+                ) : conversations.length === 0 ? (
+                  <div className="p-4 text-center text-muted">
+                    <i className="bi bi-chat fs-1"></i>
+                    <p className="mt-2 mb-0">Немає діалогів</p>
+                    <small>Шукайте користувачів та починайте спілкування</small>
+                  </div>
+                ) : (
+                  <ListGroup variant="flush">
+                    {conversations.map((conv) => {
+                      const isActive = activeConversation?.id === conv.id;
+                      return (
+                        <ListGroup.Item
+                          key={conv.id}
+                          action
+                          onClick={() => handleSelectConversation(conv)}
+                          className={`d-flex align-items-center py-3 border-0 border-bottom rounded-0 chat-conversation-item ${
+                            isActive ? "bg-light border-start border-4 border-success" : ""
+                          }`}
+                        >
+                          <img
+                            src={conv.other_user?.avatar_url || userAvatar}
+                            alt=""
+                            className="rounded-circle me-3"
+                            style={{ width: 48, height: 48, objectFit: "cover" }}
+                          />
+                          <div className="flex-grow-1 overflow-hidden">
+                            <div className="d-flex justify-content-between align-items-start">
+                              <span className="fw-semibold text-truncate">
+                                {conv.other_user?.full_name || "Unknown"}
+                              </span>
+                              {conv.last_message && (
+                                <small className="text-muted ms-2 flex-shrink-0" style={{fontSize: "0.75rem"}}>
+                                  {formatTime(conv.last_message.created_at)}
+                                </small>
+                              )}
+                            </div>
+                            <small className="text-muted text-truncate d-block mt-1">
+                              {formatLastMessage(conv.last_message)}
+                            </small>
+                          </div>
+                        </ListGroup.Item>
+                      );
+                    })}
+                  </ListGroup>
+                )}
+              </div>
+            </Col>
+
+            {/* Chat area */}
+            <Col
+              xs={12}
+              md={8}
+              lg={8}
+              className={`bg-white chat-main h-100 flex-column ${
+                !activeConversation ? "d-none d-md-flex" : "d-flex"
+              }`}
+            >
+              {activeConversation ? (
+                <>
+                  <div className="p-3 border-bottom chat-header flex-shrink-0 d-flex align-items-center justify-content-between">
+                    <div className="d-flex align-items-center">
+                      <Button
+                        variant="link"
+                        className="d-md-none p-0 text-secondary flex-shrink-0 me-3"
+                        onClick={() => {
+                          setActiveConversation(null);
+                          navigate("/chat");
+                        }}
+                        aria-label="Назад до списку"
                       >
-                        {!isOwn && (
-                          <small className="d-block text-muted mb-1">
-                            {msg.sender_profile?.full_name || "User"}
+                        <i className="bi bi-arrow-left fs-4"></i>
+                      </Button>
+                      <img
+                        src={activeConversation.other_user?.avatar_url || userAvatar}
+                        alt=""
+                        className="rounded-circle flex-shrink-0 me-3"
+                        style={{ width: 42, height: 42, objectFit: "cover" }}
+                      />
+                      <div className="chat-header-info">
+                        <h6 className="mb-0 fw-bold">
+                          {activeConversation.other_user?.full_name || "Unknown"}
+                        </h6>
+                        {isChatBlocked && (
+                          <small className="text-muted d-block">
+                            {isBlockedByMe
+                              ? "Користувача заблоковано"
+                              : "Повідомлення недоступні"}
                           </small>
                         )}
-                        {routeShare ? (
-                          <>
-                            {routeShare.text && (
-                              <p
-                                className="mb-2"
+                      </div>
+                    </div>
+                    
+                    <div className="chat-header-actions">
+                      {activeConversation.other_user?.id && (
+                        <Button
+                          variant={isBlockedByMe ? "outline-secondary" : "outline-danger"}
+                          size="sm"
+                          className="me-2"
+                          onClick={handleToggleBlock}
+                          disabled={blockLoading}
+                        >
+                          {blockLoading ? (
+                            <Spinner animation="border" size="sm" />
+                          ) : isBlockedByMe ? (
+                            "Розблокувати"
+                          ) : (
+                            <i className="bi bi-ban"></i>
+                          )}
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="chat-messages p-3 flex-grow-1 overflow-y-auto" style={{ backgroundColor: "#f8f9fa" }}>
+                    {messages.map((msg) => {
+                      const isOwn = msg.sender_id === user.id;
+                      let routeShare: RouteShareMessagePayload | null = null;
+                      try {
+                        const parsed = JSON.parse(msg.content) as RouteShareMessagePayload;
+                        if (parsed && parsed.type === "route_share") {
+                          routeShare = parsed;
+                        }
+                      } catch {
+                        routeShare = null;
+                      }
+                      return (
+                        <div
+                          key={msg.id}
+                          className={`d-flex mb-3 ${isOwn ? "justify-content-end" : "justify-content-start"}`}
+                        >
+                          <div
+                            className={`rounded-4 px-3 py-2 shadow-sm ${
+                              isOwn
+                                ? "bg-success text-white"
+                                : "bg-white text-dark border"
+                            }`}
+                            style={{ maxWidth: "80%", borderBottomRightRadius: isOwn ? "4px" : "16px", borderBottomLeftRadius: !isOwn ? "4px" : "16px" }}
+                          >
+                            {!isOwn && (
+                              <small className="d-block text-muted mb-1 fw-semibold" style={{fontSize: "0.75rem"}}>
+                                {msg.sender_profile?.full_name || "User"}
+                              </small>
+                            )}
+                            {routeShare ? (
+                              <>
+                                {routeShare.text && (
+                                  <p
+                                    className="mb-2"
+                                    style={{
+                                      whiteSpace: "pre-wrap",
+                                      wordBreak: "break-word",
+                                    }}
+                                  >
+                                    {routeShare.text}
+                                  </p>
+                                )}
+                                <Card
+                                  className={`border-0 overflow-hidden ${
+                                    isOwn ? "bg-success-subtle" : "bg-light"
+                                  }`}
+                                >
+                                  {routeShare.route.points && (
+                                    <MapPreview
+                                      points={routeShare.route.points}
+                                      isPublic={routeShare.route.is_public}
+                                      height={140}
+                                    />
+                                  )}
+                                  <Card.Body className="p-2">
+                                    <div className="d-flex justify-content-between align-items-center">
+                                      <div>
+                                        <div className="fw-semibold text-dark" style={{fontSize: "0.9rem"}}>
+                                          {routeShare.route.name}
+                                        </div>
+                                        {routeShare.route.distance_km !==
+                                          undefined && (
+                                          <small className="text-muted">
+                                            {(routeShare.route.distance_km || 0).toFixed(
+                                              1
+                                            )}{" "}
+                                            км
+                                          </small>
+                                        )}
+                                      </div>
+                                      <Button
+                                        variant="success"
+                                        size="sm"
+                                        className="rounded-circle"
+                                        onClick={() =>
+                                          handleOpenSharedRoute(routeShare!.route)
+                                        }
+                                      >
+                                        <i className="bi bi-map"></i>
+                                      </Button>
+                                    </div>
+                                  </Card.Body>
+                                </Card>
+                              </>
+                            ) : (
+                              <div
                                 style={{
                                   whiteSpace: "pre-wrap",
                                   wordBreak: "break-word",
+                                  fontSize: "0.95rem"
                                 }}
                               >
-                                {routeShare.text}
-                              </p>
+                                {msg.content}
+                              </div>
                             )}
-                            <Card
-                              className={`border-0 ${
-                                isOwn ? "bg-success-subtle" : "bg-light"
+                            <div
+                              className={`text-end mt-1 ${
+                                isOwn ? "text-white-50" : "text-muted"
                               }`}
+                              style={{ fontSize: "0.7rem" }}
                             >
-                              {routeShare.route.points && (
-                                <MapPreview
-                                  points={routeShare.route.points}
-                                  isPublic={routeShare.route.is_public}
-                                  height={160}
-                                />
-                              )}
-                              <Card.Body className="p-2">
-                                <div className="d-flex justify-content-between align-items-center">
-                                  <div>
-                                    <div className="fw-semibold">
-                                      {routeShare.route.name}
-                                    </div>
-                                    {routeShare.route.distance_km !==
-                                      undefined && (
-                                      <small className="text-muted">
-                                        {(routeShare.route.distance_km || 0).toFixed(
-                                          1
-                                        )}{" "}
-                                        км
-                                      </small>
-                                    )}
-                                  </div>
-                                  <Button
-                                    variant="outline-success"
-                                    size="sm"
-                                    onClick={() =>
-                                      handleOpenSharedRoute(routeShare!.route)
-                                    }
-                                  >
-                                    <i className="bi bi-map"></i>
-                                  </Button>
-                                </div>
-                              </Card.Body>
-                            </Card>
-                          </>
-                        ) : (
-                          <span
-                            style={{
-                              whiteSpace: "pre-wrap",
-                              wordBreak: "break-word",
-                            }}
-                          >
-                            {msg.content}
-                          </span>
-                        )}
-                        <small
-                          className={`d-block mt-1 ${
-                            isOwn ? "text-white-50" : "text-muted"
-                          }`}
-                        >
-                          {formatTime(msg.created_at)}
-                        </small>
-                      </div>
-                    </div>
-                  );
-                })}
-                <div ref={messagesEndRef} />
-              </div>
-
-              {/* Message input (фіксований знизу) */}
-              {isChatBlocked && !isBlockedByMe && (
-                <Alert variant="warning" className="m-3 mb-0 py-2 flex-shrink-0">
-                  Цей користувач недоступний для листування.
-                </Alert>
-              )}
-              <Form onSubmit={handleSend} className="p-3 border-top chat-input-area flex-shrink-0">
-                {sharedRoute && (
-                  <div className="mb-2 p-2 rounded bg-light border d-flex align-items-center">
-                    <div className="flex-grow-1">
-                      <div className="fw-semibold">
-                        Sharing route: {sharedRoute.name}
-                      </div>
-                      {sharedRoute.distance_km !== undefined && (
-                        <small className="text-muted">
-                          {(sharedRoute.distance_km || 0).toFixed(1)} км
-                        </small>
-                      )}
-                    </div>
-                    <Button
-                      variant="outline-danger"
-                      size="sm"
-                      onClick={() => {
-                        setSharedRoute(null);
-                        localStorage.removeItem("routeToShare");
-                      }}
-                    >
-                      <i className="bi bi-x"></i>
-                    </Button>
+                              {formatTime(msg.created_at)}
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    <div ref={messagesEndRef} />
                   </div>
-                )}
-                <div className="d-flex gap-2">
-                  <Form.Control
-                    type="text"
-                    placeholder="Type a message..."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    disabled={sending || isChatBlocked}
-                  />
-                  <Button
-                    type="submit"
-                    variant="success"
-                    disabled={
-                      sending ||
-                      isChatBlocked ||
-                      (!newMessage.trim() && !sharedRoute)
-                    }
-                  >
-                    {sending ? (
-                      <Spinner animation="border" size="sm" />
-                    ) : (
-                      <i className="bi bi-send"></i>
+
+                  {/* Message input */}
+                  {isChatBlocked && !isBlockedByMe && (
+                    <Alert variant="warning" className="m-3 mb-0 py-2 flex-shrink-0 text-center rounded-4">
+                      Цей користувач недоступний для листування.
+                    </Alert>
+                  )}
+                  <Form onSubmit={handleSend} className="p-3 bg-white border-top chat-input-area flex-shrink-0">
+                    {sharedRoute && (
+                      <div className="mb-2 p-2 rounded-3 bg-light border d-flex align-items-center">
+                        <div className="flex-grow-1">
+                          <div className="fw-semibold small">
+                            Прикріплений маршрут: {sharedRoute.name}
+                          </div>
+                        </div>
+                        <Button
+                          variant="light"
+                          className="text-danger p-1"
+                          size="sm"
+                          onClick={() => {
+                            setSharedRoute(null);
+                            localStorage.removeItem("routeToShare");
+                          }}
+                        >
+                          <i className="bi bi-x-lg"></i>
+                        </Button>
+                      </div>
                     )}
-                  </Button>
+                    <div className="d-flex gap-2">
+                      <Form.Control
+                        type="text"
+                        placeholder="Напишіть повідомлення..."
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        disabled={sending || isChatBlocked}
+                        className="rounded-pill px-3"
+                      />
+                      <Button
+                        type="submit"
+                        variant="success"
+                        className="rounded-circle d-flex align-items-center justify-content-center"
+                        style={{ width: "42px", height: "42px" }}
+                        disabled={
+                          sending ||
+                          isChatBlocked ||
+                          (!newMessage.trim() && !sharedRoute)
+                        }
+                      >
+                        {sending ? (
+                          <Spinner animation="border" size="sm" />
+                        ) : (
+                          <i className="bi bi-send-fill"></i>
+                        )}
+                      </Button>
+                    </div>
+                  </Form>
+                </>
+              ) : (
+                <div className="flex-grow-1 d-flex align-items-center justify-content-center text-muted bg-light">
+                  <div className="text-center">
+                    <i className="bi bi-chat-quote display-1 text-secondary opacity-50"></i>
+                    <p className="mt-3 mb-0 fw-medium">Оберіть чат для спілкування</p>
+                    <small>Або знайдіть користувача через пошук</small>
+                  </div>
                 </div>
-              </Form>
-            </>
-          ) : (
-            <div className="flex-grow-1 d-flex align-items-center justify-content-center text-muted">
-              <div className="text-center">
-                <i className="bi bi-chat-left-text display-1"></i>
-                <p className="mt-3 mb-0">Select a conversation or start a new chat</p>
-                <small>Search for users and click "Message" on their profile</small>
-              </div>
-            </div>
-          )}
-        </Col>
-      </Row>
+              )}
+            </Col>
+          </Row>
+        </Card>
+      </div>
     </Container>
   );
 }
