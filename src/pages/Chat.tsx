@@ -64,7 +64,7 @@ function Chat() {
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const containerRef = useRef<HTMLDivElement>(null); // Реф для вимірювання висоти
+  const containerRef = useRef<HTMLDivElement>(null); 
   
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
   const [sharedRoute, setSharedRoute] = useState<SharedRoutePreview | null>(null);
@@ -75,30 +75,46 @@ function Chat() {
   const [userSearchResults, setUserSearchResults] = useState<UserProfile[]>([]);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
   
-  // Динамічна висота для контейнера
-  const [chatHeight, setChatHeight] = useState("calc(100vh - 70px)");
+  // Початкова висота
+  const [chatHeight, setChatHeight] = useState("100%");
 
-  // Вимірюємо точний відступ згори (навігаційну панель) та встановлюємо висоту
+  // Розумний підрахунок висоти екрану (враховуючи мобільну навігацію)
   useEffect(() => {
     const updateHeight = () => {
       if (containerRef.current) {
-        const topOffset = containerRef.current.getBoundingClientRect().top;
-        // Запобігаємо випадкам, коли topOffset від'ємний або нереалістичний
-        const safeOffset = Math.max(topOffset, 0); 
-        setChatHeight(`calc(100vh - ${safeOffset}px)`);
+        // Визначаємо відступ зверху (шапка додатку)
+        const topOffset = Math.max(containerRef.current.getBoundingClientRect().top, 0);
+        
+        // Визначаємо висоту нижньої навігації (якщо вона є)
+        let bottomOffset = 0;
+        const navElements = document.querySelectorAll('nav, .bottom-nav, .fixed-bottom');
+        
+        navElements.forEach(nav => {
+          const rect = nav.getBoundingClientRect();
+          // Якщо елемент знаходиться в самому низу вікна - це наша навігація
+          if (rect.bottom >= window.innerHeight - 10 && rect.top > window.innerHeight / 2) {
+            bottomOffset = rect.height;
+          }
+        });
+
+        // Реальна висота вікна (виправляє баг 100vh на Safari/Chrome mobile)
+        const realWindowHeight = window.innerHeight;
+        
+        // Точна висота чату = весь екран мінус шапка мінус нижня навігація
+        const exactHeight = realWindowHeight - topOffset - bottomOffset;
+        setChatHeight(`${exactHeight}px`);
       }
     };
 
-    // Запускаємо відразу і при зміні розміру вікна
     updateHeight();
-    
-    // Невелика затримка для випадків, коли рендеряться картинки чи стилі в навбарі
-    const timeoutId = setTimeout(updateHeight, 100);
+    const timeoutId1 = setTimeout(updateHeight, 100);
+    const timeoutId2 = setTimeout(updateHeight, 500);
 
     window.addEventListener("resize", updateHeight);
     return () => {
       window.removeEventListener("resize", updateHeight);
-      clearTimeout(timeoutId);
+      clearTimeout(timeoutId1);
+      clearTimeout(timeoutId2);
     };
   }, [authLoading]);
 
@@ -437,7 +453,6 @@ function Chat() {
   }
 
   return (
-    // Замість фіксованих 65px використовуємо chatHeight
     <Container 
       fluid 
       className="chat-page p-0" 
