@@ -61,10 +61,12 @@ function Chat() {
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
-  const [notificationPermission, setNotificationPermission] =
-    useState<NotificationPermission | "unsupported">("default");
+  const containerRef = useRef<HTMLDivElement>(null); // Реф для вимірювання висоти
+  
+  const [notificationPermission, setNotificationPermission] = useState<NotificationPermission | "unsupported">("default");
   const [sharedRoute, setSharedRoute] = useState<SharedRoutePreview | null>(null);
   const [isBlockedByMe, setIsBlockedByMe] = useState(false);
   const [isChatBlocked, setIsChatBlocked] = useState(false);
@@ -72,12 +74,38 @@ function Chat() {
   const [userSearchQuery, setUserSearchQuery] = useState("");
   const [userSearchResults, setUserSearchResults] = useState<UserProfile[]>([]);
   const [userSearchLoading, setUserSearchLoading] = useState(false);
+  
+  // Динамічна висота для контейнера
+  const [chatHeight, setChatHeight] = useState("calc(100vh - 70px)");
+
+  // Вимірюємо точний відступ згори (навігаційну панель) та встановлюємо висоту
+  useEffect(() => {
+    const updateHeight = () => {
+      if (containerRef.current) {
+        const topOffset = containerRef.current.getBoundingClientRect().top;
+        // Запобігаємо випадкам, коли topOffset від'ємний або нереалістичний
+        const safeOffset = Math.max(topOffset, 0); 
+        setChatHeight(`calc(100vh - ${safeOffset}px)`);
+      }
+    };
+
+    // Запускаємо відразу і при зміні розміру вікна
+    updateHeight();
+    
+    // Невелика затримка для випадків, коли рендеряться картинки чи стилі в навбарі
+    const timeoutId = setTimeout(updateHeight, 100);
+
+    window.addEventListener("resize", updateHeight);
+    return () => {
+      window.removeEventListener("resize", updateHeight);
+      clearTimeout(timeoutId);
+    };
+  }, [authLoading]);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
 
-  // Track browser notification permission for this page (UI hint)
   useEffect(() => {
     if (typeof window === "undefined" || typeof Notification === "undefined") {
       setNotificationPermission("unsupported");
@@ -86,7 +114,6 @@ function Chat() {
     setNotificationPermission(Notification.permission);
   }, []);
 
-  // Load route to share (from favorites) if present
   useEffect(() => {
     if (!hasSharedRouteFlag) return;
     try {
@@ -95,9 +122,7 @@ function Chat() {
         const parsed = JSON.parse(stored) as SharedRoutePreview;
         setSharedRoute(parsed);
         if (!newMessage) {
-          setNewMessage(
-            `I want to share a walking route with you: "${parsed.name}".`
-          );
+          setNewMessage(`I want to share a walking route with you: "${parsed.name}".`);
         }
       }
     } catch (err) {
@@ -116,7 +141,6 @@ function Chat() {
     }
   };
 
-  // Load conversations
   const loadConversations = useCallback(async (): Promise<ConversationWithOtherUser[]> => {
     if (!user) return [];
     try {
@@ -149,7 +173,6 @@ function Chat() {
     []
   );
 
-  // Load or create conversation when route/query changes
   useEffect(() => {
     if (authLoading) return;
     if (!user) {
@@ -165,7 +188,6 @@ function Chat() {
       try {
         const convs = await loadConversations();
 
-        // Start new chat with user
         if (withUserId) {
           const conv = await getOrCreateConversation(withUserId);
           const otherProfile = await getUserProfile(withUserId);
@@ -192,7 +214,6 @@ function Chat() {
     init();
   }, [user, authLoading, routeConvId, withUserId, loadConversations]);
 
-  // When active conversation changes, load messages and subscribe
   useEffect(() => {
     if (!activeConversation) {
       setMessages([]);
@@ -209,7 +230,6 @@ function Chat() {
         if (mounted) setError(err.message || "Failed to load messages");
       }
 
-      // Subscribe to new messages
       const channel = subscribeToMessages(activeConversation.id, (msg) => {
         setMessages((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev;
@@ -417,8 +437,13 @@ function Chat() {
   }
 
   return (
-    // Задаємо висоту контейнера (віднімаємо приблизну висоту навбару, напр. 65px)
-    <Container fluid className="chat-page p-0" style={{ height: "calc(100vh - 65px)", overflow: "hidden" }}>
+    // Замість фіксованих 65px використовуємо chatHeight
+    <Container 
+      fluid 
+      className="chat-page p-0" 
+      ref={containerRef}
+      style={{ height: chatHeight, overflow: "hidden" }}
+    >
       <Row className="g-0 h-100 chat-layout-row">
         {/* Conversation list (Sidebar) */}
         <Col
