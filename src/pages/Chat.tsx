@@ -397,7 +397,7 @@ function Chat() {
 
   if (authLoading) {
     return (
-      <Container className="chat-page d-flex align-items-center justify-content-center">
+      <Container className="chat-page d-flex align-items-center justify-content-center h-100">
         <div className="text-center py-4">
           <Spinner animation="border" variant="success" />
           <p className="mt-3 mb-0">Loading...</p>
@@ -407,7 +407,7 @@ function Chat() {
   }
   if (!user) {
     return (
-      <Container className="chat-page text-center py-4">
+      <Container className="chat-page text-center py-4 h-100">
         <Alert variant="warning">Please log in to use chat.</Alert>
         <Button variant="success" onClick={() => navigate("/login")}>
           Log in
@@ -417,18 +417,20 @@ function Chat() {
   }
 
   return (
-    <Container fluid className="chat-page">
-      <Row className="g-0 chat-layout-row">
-        {/* Conversation list */}
+    // Задаємо висоту контейнера (віднімаємо приблизну висоту навбару, напр. 65px)
+    <Container fluid className="chat-page p-0" style={{ height: "calc(100vh - 65px)", overflow: "hidden" }}>
+      <Row className="g-0 h-100 chat-layout-row">
+        {/* Conversation list (Sidebar) */}
         <Col
           xs={12}
           md={4}
           lg={3}
-          className={`border-end bg-light chat-sidebar ${
-            activeConversation ? "d-none d-md-block" : ""
+          className={`border-end bg-light chat-sidebar flex-column h-100 ${
+            activeConversation ? "d-none d-md-flex" : "d-flex"
           }`}
         >
-          <div className="p-3 border-bottom bg-white">
+          {/* Фіксована шапка сайдбару */}
+          <div className="p-3 border-bottom bg-white flex-shrink-0">
             <h5 className="mb-3">
               <i className="bi bi-chat-dots me-2"></i>
               Повідомлення
@@ -485,60 +487,63 @@ function Chat() {
             )}
           </div>
 
-          {loading ? (
-            <div className="text-center py-5">
-              <Spinner animation="border" variant="success" />
-              <p className="mt-2 text-muted">Loading conversations...</p>
-            </div>
-          ) : error ? (
-            <Alert variant="danger" className="m-3">
-              {error}
-            </Alert>
-          ) : conversations.length === 0 ? (
-            <div className="p-4 text-center text-muted">
-              <i className="bi bi-chat fs-1"></i>
-              <p className="mt-2 mb-0">No conversations yet</p>
-              <small>Search for users and start a chat from their profile</small>
-            </div>
-          ) : (
-            <ListGroup variant="flush">
-              {conversations.map((conv) => {
-                const isActive = activeConversation?.id === conv.id;
-                return (
-                  <ListGroup.Item
-                    key={conv.id}
-                    action
-                    onClick={() => handleSelectConversation(conv)}
-                    className={`d-flex align-items-center py-3 border-0 border-bottom rounded-0 chat-conversation-item ${
-                      isActive ? "chat-conversation-item--active" : ""
-                    }`}
-                  >
-                    <img
-                      src={conv.other_user?.avatar_url || userAvatar}
-                      alt=""
-                      className="rounded-circle me-3"
-                      style={{ width: 48, height: 48, objectFit: "cover" }}
-                    />
-                    <div className="flex-grow-1 overflow-hidden">
-                      <div className="d-flex justify-content-between align-items-start">
-                        <span className="fw-semibold text-truncate">
-                          {conv.other_user?.full_name || "Unknown"}
-                        </span>
-                        {conv.last_message && (
-                          <small className="text-muted ms-2 flex-shrink-0">
-                            {formatTime(conv.last_message.created_at)}
-                          </small>
-                        )}
+          {/* Список чатів з прокруткою */}
+          <div className="flex-grow-1 overflow-y-auto">
+            {loading ? (
+              <div className="text-center py-5">
+                <Spinner animation="border" variant="success" />
+                <p className="mt-2 text-muted">Loading conversations...</p>
+              </div>
+            ) : error ? (
+              <Alert variant="danger" className="m-3">
+                {error}
+              </Alert>
+            ) : conversations.length === 0 ? (
+              <div className="p-4 text-center text-muted">
+                <i className="bi bi-chat fs-1"></i>
+                <p className="mt-2 mb-0">No conversations yet</p>
+                <small>Search for users and start a chat from their profile</small>
+              </div>
+            ) : (
+              <ListGroup variant="flush">
+                {conversations.map((conv) => {
+                  const isActive = activeConversation?.id === conv.id;
+                  return (
+                    <ListGroup.Item
+                      key={conv.id}
+                      action
+                      onClick={() => handleSelectConversation(conv)}
+                      className={`d-flex align-items-center py-3 border-0 border-bottom rounded-0 chat-conversation-item ${
+                        isActive ? "chat-conversation-item--active" : ""
+                      }`}
+                    >
+                      <img
+                        src={conv.other_user?.avatar_url || userAvatar}
+                        alt=""
+                        className="rounded-circle me-3"
+                        style={{ width: 48, height: 48, objectFit: "cover" }}
+                      />
+                      <div className="flex-grow-1 overflow-hidden">
+                        <div className="d-flex justify-content-between align-items-start">
+                          <span className="fw-semibold text-truncate">
+                            {conv.other_user?.full_name || "Unknown"}
+                          </span>
+                          {conv.last_message && (
+                            <small className="text-muted ms-2 flex-shrink-0">
+                              {formatTime(conv.last_message.created_at)}
+                            </small>
+                          )}
+                        </div>
+                        <small className="text-muted text-truncate d-block">
+                          {formatLastMessage(conv.last_message)}
+                        </small>
                       </div>
-                      <small className="text-muted text-truncate d-block">
-                        {formatLastMessage(conv.last_message)}
-                      </small>
-                    </div>
-                  </ListGroup.Item>
-                );
-              })}
-            </ListGroup>
-          )}
+                    </ListGroup.Item>
+                  );
+                })}
+              </ListGroup>
+            )}
+          </div>
         </Col>
 
         {/* Chat area */}
@@ -546,48 +551,52 @@ function Chat() {
           xs={12}
           md={8}
           lg={9}
-          className={`d-flex flex-column bg-white chat-main ${
-            !activeConversation ? "d-none d-md-flex" : ""
+          className={`bg-white chat-main h-100 flex-column ${
+            !activeConversation ? "d-none d-md-flex" : "d-flex"
           }`}
         >
           {activeConversation ? (
             <>
-              {/* Chat header */}
-              <div className="p-3 border-bottom chat-header">
-                <Button
-                  variant="link"
-                  className="d-md-none p-0 text-success flex-shrink-0"
-                  onClick={() => {
-                    setActiveConversation(null);
-                    navigate("/chat");
-                  }}
-                  aria-label="Назад до списку"
-                >
-                  <i className="bi bi-arrow-left fs-5"></i>
-                </Button>
-                <img
-                  src={activeConversation.other_user?.avatar_url || userAvatar}
-                  alt=""
-                  className="rounded-circle flex-shrink-0"
-                  style={{ width: 40, height: 40, objectFit: "cover" }}
-                />
-                <div className="chat-header-info">
-                  <h5 className="mb-0">
-                    {activeConversation.other_user?.full_name || "Unknown"}
-                  </h5>
-                  {isChatBlocked && (
-                    <small className="text-muted d-block">
-                      {isBlockedByMe
-                        ? "Користувача заблоковано"
-                        : "Повідомлення недоступні"}
-                    </small>
-                  )}
+              {/* Фіксована шапка чату */}
+              <div className="p-3 border-bottom chat-header flex-shrink-0 d-flex align-items-center justify-content-between">
+                <div className="d-flex align-items-center">
+                  <Button
+                    variant="link"
+                    className="d-md-none p-0 text-success flex-shrink-0 me-2"
+                    onClick={() => {
+                      setActiveConversation(null);
+                      navigate("/chat");
+                    }}
+                    aria-label="Назад до списку"
+                  >
+                    <i className="bi bi-arrow-left fs-5"></i>
+                  </Button>
+                  <img
+                    src={activeConversation.other_user?.avatar_url || userAvatar}
+                    alt=""
+                    className="rounded-circle flex-shrink-0 me-3"
+                    style={{ width: 40, height: 40, objectFit: "cover" }}
+                  />
+                  <div className="chat-header-info">
+                    <h5 className="mb-0">
+                      {activeConversation.other_user?.full_name || "Unknown"}
+                    </h5>
+                    {isChatBlocked && (
+                      <small className="text-muted d-block">
+                        {isBlockedByMe
+                          ? "Користувача заблоковано"
+                          : "Повідомлення недоступні"}
+                      </small>
+                    )}
+                  </div>
                 </div>
+                
                 <div className="chat-header-actions">
                   {activeConversation.other_user?.id && (
                     <Button
                       variant={isBlockedByMe ? "outline-secondary" : "outline-danger"}
                       size="sm"
+                      className="me-2"
                       onClick={handleToggleBlock}
                       disabled={blockLoading}
                     >
@@ -612,8 +621,8 @@ function Chat() {
                 </div>
               </div>
 
-              {/* Messages */}
-              <div className="chat-messages p-3">
+              {/* Messages area з прокруткою */}
+              <div className="chat-messages p-3 flex-grow-1 overflow-y-auto">
                 {messages.map((msg) => {
                   const isOwn = msg.sender_id === user.id;
                   let routeShare: RouteShareMessagePayload | null = null;
@@ -721,13 +730,13 @@ function Chat() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Message input */}
+              {/* Message input (фіксований знизу) */}
               {isChatBlocked && !isBlockedByMe && (
-                <Alert variant="warning" className="m-3 mb-0 py-2">
+                <Alert variant="warning" className="m-3 mb-0 py-2 flex-shrink-0">
                   Цей користувач недоступний для листування.
                 </Alert>
               )}
-              <Form onSubmit={handleSend} className="p-3 border-top chat-input-area">
+              <Form onSubmit={handleSend} className="p-3 border-top chat-input-area flex-shrink-0">
                 {sharedRoute && (
                   <div className="mb-2 p-2 rounded bg-light border d-flex align-items-center">
                     <div className="flex-grow-1">

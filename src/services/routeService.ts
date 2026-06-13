@@ -833,7 +833,7 @@ export async function reanalyzeRoutePois(
   // Якщо фільтрація по типах не спрацювала ідеально, беремо просто найближчі 2 точки
   if (selectedPois.length === 0 && poisWithDistance.length > 0) {
       poisWithDistance.sort((a, b) => a.minDistance - b.minDistance);
-      selectedPois.push(...poisWithDistance.slice(0, 2).map(p => p.poi));
+      selectedPois.push(...poisWithDistance.slice(0, 1).map(p => p.poi));
   }
 
   return selectedPois.map(poi => ({
