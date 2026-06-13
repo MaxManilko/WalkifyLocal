@@ -30,15 +30,24 @@ const PlaceInfoCard: React.FC<PlaceInfoCardProps> = ({ waypoint, stopNumber, onC
 
   return (
     <div
-      className="card shadow-lg border-0 rounded-4 overflow-hidden place-info-card"
-      style={{ position: 'fixed', bottom: 24, left: '50%', transform: 'translateX(-50%)', zIndex: 1300, width: 'min(380px, calc(100vw - 32px))' }}
+      className="card shadow-lg border-0 rounded-4 overflow-hidden place-info-card d-flex flex-column"
+      style={{ 
+        position: 'fixed', 
+        bottom: 120, /* Піднято високо над навігаційним меню! */
+        left: '50%', 
+        transform: 'translateX(-50%)', 
+        zIndex: 1300, 
+        width: 'min(380px, calc(100vw - 32px))',
+        maxHeight: '60vh' /* Картка не буде займати більше 60% висоти екрану */
+      }}
     >
+      {/* Блок з фотографією (завжди фіксований зверху картки) */}
       {photoUrl && (
-        <div style={{ height: 160, background: '#e9ecef', position: 'relative' }}>
+        <div className="flex-shrink-0" style={{ height: 160, background: '#e9ecef', position: 'relative' }}>
           <img src={photoUrl} alt={waypoint.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
           <button
             type="button"
-            className="btn btn-light btn-sm rounded-circle position-absolute"
+            className="btn btn-light btn-sm rounded-circle position-absolute shadow-sm"
             style={{ top: 8, right: 8, width: 32, height: 32, padding: 0 }}
             onClick={onClose}
           >
@@ -47,11 +56,12 @@ const PlaceInfoCard: React.FC<PlaceInfoCardProps> = ({ waypoint, stopNumber, onC
         </div>
       )}
 
-      <div className="card-body p-3">
+      {/* Тіло картки з прокруткою (якщо контенту забагато) */}
+      <div className="card-body p-3 overflow-y-auto">
         {!photoUrl && (
           <div className="d-flex justify-content-between align-items-start mb-2">
             <span className="fs-4">{catInfo.emoji}</span>
-            <button type="button" className="btn-close" onClick={onClose}></button>
+            <button type="button" className="btn-close shadow-none" onClick={onClose}></button>
           </div>
         )}
 
@@ -91,7 +101,7 @@ const PlaceInfoCard: React.FC<PlaceInfoCardProps> = ({ waypoint, stopNumber, onC
         )}
 
         {details?.openingHours && details.openingHours.length > 0 && (
-          <div className="small text-muted mb-2" style={{ maxHeight: 80, overflowY: 'auto' }}>
+          <div className="small text-muted mb-2">
             {details.openingHours.map((line, i) => (
               <div key={i}>{line}</div>
             ))}
