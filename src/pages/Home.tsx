@@ -10,7 +10,7 @@ import {
   RouteFilterOptions, 
   RouteDestination, 
   navigateToSavedRoute, 
-  reanalyzeRoutePois 
+  rebuildRouteWithNewPois 
 } from "../services/routeService";
 import { useAuth } from "../context/AuthContext";
 import { saveRoute } from "../services/supabaseService";
@@ -19,22 +19,24 @@ import "../styles/home.css";
 
 // Всі доступні категорії фільтрів для додавання нових точок
 const AVAILABLE_CATEGORIES = [
-  { id: "park", label: "Парки", emoji: "🌳" },
-  { id: "natural_feature", label: "Природа та водойми", emoji: "🌊" },
+  { id: "park", label: "Парки та природа", emoji: "🌳" },
   { id: "cafe", label: "Кав'ярні", emoji: "☕" },
   { id: "restaurant", label: "Ресторани", emoji: "🍽️" },
   { id: "bakery", label: "Пекарні", emoji: "🥐" },
-  { id: "store", label: "Магазини", emoji: "🛍️" },
-  { id: "shopping_mall", label: "Торгові центри", emoji: "🏢" },
   { id: "museum", label: "Музеї", emoji: "🏛️" },
   { id: "art_gallery", label: "Галереї", emoji: "🎨" },
-  { id: "tourist_attraction", label: "Визначні місця", emoji: "⭐" },
-  { id: "church", label: "Храми", emoji: "⛪" },
   { id: "library", label: "Бібліотеки", emoji: "📚" },
-  { id: "gym", label: "Спортзали", emoji: "🏋️" },
-  { id: "spa", label: "Спа", emoji: "💆" },
-  { id: "movie_theater", label: "Кінотеатри", emoji: "🍿" },
-  { id: "night_club", label: "Клуби / Бари", emoji: "🍸" },
+  { id: "book_store", label: "Книгарні", emoji: "📖" },
+  { id: "church", label: "Храми", emoji: "⛪" },
+  { id: "tourist_attraction", label: "Визначні місця", emoji: "⭐" },
+  { id: "store", label: "Магазини", emoji: "🛍️" },
+  { id: "shopping_mall", label: "Торгові центри", emoji: "🏬" },
+  { id: "gym", label: "Спортзали", emoji: "💪" },
+  { id: "spa", label: "СПА та велнес", emoji: "🧖" },
+  { id: "zoo", label: "Зоопарки", emoji: "🦁" },
+  { id: "stadium", label: "Стадіони", emoji: "🏟️" },
+  { id: "movie_theater", label: "Кінотеатри", emoji: "🎬" },
+  { id: "night_club", label: "Бари та клуби", emoji: "🎵" },
   { id: "playground", label: "Майданчики", emoji: "🛝" },
 ];
 
@@ -149,7 +151,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     setSidebarOpen(true);
   }, []);
 
-  // Оновлена функція отримання геолокації (Надійніша)
+  // Оновлена функція отримання геолокації
   const runWithGeolocation = (task: (userLoc: [number, number]) => Promise<void>) => {
     if (!navigator.geolocation) {
       alert("Ваш браузер не підтримує геолокацію.");
@@ -165,13 +167,13 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
       },
       (error) => {
         console.warn("Помилка геолокації:", error.message);
-        let msg = "Помилка геолокації. Будь ласка, увімкніть GPS або перевірте дозволи.";
-        if (error.code === 3) msg = "Час очікування геолокації вичерпано. Перевірте з'єднання.";
+        let msg = "Помилка геолокації. Будь ласка, увімкніть GPS або перевірте дозволи браузера.";
+        if (error.code === 3) msg = "Час очікування геолокації вичерпано. Перевірте з'єднання з інтернетом.";
         alert(msg);
         setIsGenerating(false);
         setRouteSummary("");
       },
-      // Пом'якшені налаштування, щоб уникати помилки тайм-ауту (highAccuracy = false)
+      // enableHighAccuracy: false запобігає зависанню і швидше отримує координати
       { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 }
     );
   };
@@ -235,13 +237,17 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
       try {
         const fullRoute = await navigateToSavedRoute(userLoc, loadedSavedRoute);
         
+        // ЗБЕРІГАЄМО в стейт новий, довгий маршрут.
+        // Це важливо: якщо тепер натиснути "Додати точки", вони будуть шукатися вздовж усього шляху!
+        setLoadedSavedRoute(fullRoute); 
+
         (mapRef.current as any).loadSavedRoute({
-          name: loadedSavedRoute.name,
+          name: fullRoute.name || "Маршрут",
           points: fullRoute.points,
           statistics: { distanceKm: fullRoute.distanceKm, estimatedTimeMinutes: fullRoute.estimatedTimeMinutes },
           waypoints: fullRoute.waypoints,
           steps: fullRoute.steps,
-          preferences: loadedSavedRoute.preferences
+          preferences: fullRoute.preferences
         });
         
         setIsNavigatingToStart(true);
@@ -262,7 +268,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     );
   };
 
-  // Знайти нові POI за обраними категоріями та оновити ТОЙ САМИЙ маршрут
+  // Знайти нові POI за обраними категоріями та перебудувати лінію
   const handleFindNewPOIs = async () => {
     if (!loadedSavedRoute || !mapRef.current) return;
     if (reselectCategories.length === 0) {
@@ -271,24 +277,18 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     }
 
     setIsGenerating(true);
-    setRouteSummary("Аналізуємо маршрут та додаємо нові цікаві місця...");
+    setRouteSummary("Аналізуємо маршрут та добудовуємо до нових місць...");
 
     try {
-      const newWaypoints = await reanalyzeRoutePois(loadedSavedRoute.points, reselectCategories);
-      
-      const updatedRoute = {
-        ...loadedSavedRoute,
-        // Додаємо нові точки до вже існуючих
-        waypoints: [...(loadedSavedRoute.waypoints || []), ...newWaypoints]
-      };
+      const updatedRoute = await rebuildRouteWithNewPois(loadedSavedRoute, reselectCategories);
       
       (mapRef.current as any).loadSavedRoute(updatedRoute);
       setLoadedSavedRoute(updatedRoute);
-      setRouteSummary(`Оновлено! Знайдено та додано ${newWaypoints.length} нових місць.`);
+      setRouteSummary(`Оновлено! Маршрут перебудовано через нові місця.`);
       setIsEditingPois(false);
       setReselectCategories([]);
     } catch (err: any) {
-      alert("Не вдалося знайти нові місця.");
+      alert(err.message || "Не вдалося добудувати нові місця.");
     } finally {
       setIsGenerating(false);
     }
@@ -406,7 +406,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
                   {isEditingPois && (
                     <div className="border border-primary-subtle rounded-4 p-3 bg-light shadow-sm mt-2 animate-fade-in">
                       <p className="text-muted small mb-3">
-                        Оберіть нові категорії. Ми знайдемо ці місця вздовж збереженого шляху і додамо їх до маршруту.
+                        Оберіть нові категорії. Ми добудуємо маршрут до цих місць уздовж вашого шляху.
                       </p>
                       
                       <div className="d-flex flex-wrap gap-2 mb-4" style={{ maxHeight: "250px", overflowY: "auto" }}>
@@ -436,7 +436,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
                           onClick={handleFindNewPOIs}
                           disabled={reselectCategories.length === 0 || isGenerating}
                         >
-                          <i className="bi bi-search me-1"></i> Знайти
+                          <i className="bi bi-search me-1"></i> Знайти та перебудувати
                         </button>
                       </div>
                     </div>

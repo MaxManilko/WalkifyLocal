@@ -58,6 +58,9 @@ export interface RouteResult {
   difficulty?: RouteDifficulty;
   elevation?: ElevationProfile;
   terrainTypes?: string[];
+  name?: string;
+  description?: string;
+  preferences?: any;
 }
 
 export interface RouteDestination {
@@ -754,10 +757,16 @@ export async function navigateToSavedRoute(
     throw new Error("Збережений маршрут не має точок.");
   }
   
-  // Збережений маршрут має точки у форматі [lat, lng]. 
-  // buildRoute очікує destination у форматі [lng, lat]!
   const startPoint = savedRoute.points[0];
   const destCoords: [number, number] = [startPoint[1], startPoint[0]];
+  
+  // ПЕРЕВІРКА: чи ми вже біля старту (радіус 50 метрів)
+  const distToStartKm = getDistanceKm(userLocation, destCoords);
+  if (distToStartKm < 0.05) {
+    // Не будуємо зайвий шлях, просто повертаємо збережений маршрут,
+    // інакше трекер миттєво порахує його завершеним через 0 дистанцію.
+    return savedRoute;
+  }
   
   // Будуємо шлях від користувача до старту маршруту
   const approachRoute = await buildRoute(userLocation, destCoords, []);
@@ -768,7 +777,7 @@ export async function navigateToSavedRoute(
     steps: [...(approachRoute.steps || []), ...(savedRoute.steps || [])],
     distanceKm: parseFloat((savedRoute.distanceKm + approachRoute.distanceKm).toFixed(2)),
     estimatedTimeMinutes: savedRoute.estimatedTimeMinutes + approachRoute.estimatedTimeMinutes,
-    waypoints: savedRoute.waypoints
+    waypoints: savedRoute.waypoints // Зберігаємо старі точки
   };
 }
 
@@ -785,9 +794,9 @@ export async function reanalyzeRoutePois(
   const allFoundPois: Place[] = [];
   
   for (const point of samplePoints) {
-    // point тут [lat, lng]. searchComprehensivePois очікує [lng, lat]!
     const lngLatPoint: [number, number] = [point[1], point[0]];
-    const pois = await searchComprehensivePois(lngLatPoint, categories, 1500); 
+    // Зменшили радіус до 400м, щоб точки були ТІЛЬКИ вздовж маршруту, а не по всьому місту
+    const pois = await searchComprehensivePois(lngLatPoint, categories, 400); 
     allFoundPois.push(...pois);
   }
 
@@ -799,7 +808,7 @@ export async function reanalyzeRoutePois(
 
   const sortedPois = Array.from(uniquePois.values())
     .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-    .slice(0, 10);
+    .slice(0, 5); // Беремо топ-5 найкращих місць
 
   return sortedPois.map(poi => ({
     location: [poi.coordinates[1], poi.coordinates[0]],
@@ -810,4 +819,50 @@ export async function reanalyzeRoutePois(
     source: 'google',
     externalId: poi.externalId
   }));
+}
+
+// НОВА ФУНКЦІЯ: Не просто знаходить нові точки, але й перебудовує саму лінію, щоб дотягнутися до них.
+export async function rebuildRouteWithNewPois(
+  currentRoute: RouteResult,
+  categories: string[]
+): Promise<RouteResult> {
+  // 1. Знаходимо нові місця вздовж лінії
+  const newWaypoints = await reanalyzeRoutePois(currentRoute.points, categories);
+
+  if (newWaypoints.length === 0) {
+    throw new Error("Не знайдено підходящих місць за обраними фільтрами поруч із маршрутом.");
+  }
+
+  // Обмежуємо до 4 нових місць, щоб не перевантажувати Google API ліміт (max 10 waypoints)
+  const limitedNewWaypoints = newWaypoints.slice(0, 4);
+
+  // 2. Збираємо координати старих і нових точок
+  const existingWaypointsCoords = (currentRoute.waypoints || []).map(wp => [wp.location[1], wp.location[0]] as [number, number]);
+  const newWaypointsCoords = limitedNewWaypoints.map(wp => [wp.location[1], wp.location[0]] as [number, number]);
+  
+  // Комбінуємо і беремо останні 8, щоб влізти в ліміти API
+  const allCoords = [...existingWaypointsCoords, ...newWaypointsCoords].slice(-8);
+
+  const startPoint = currentRoute.points[0];
+  const endPoint = currentRoute.points[currentRoute.points.length - 1];
+
+  const startLngLat: [number, number] = [startPoint[1], startPoint[0]];
+  const endLngLat: [number, number] = [endPoint[1], endPoint[0]];
+
+  // 3. ПЕРЕБУДОВУЄМО МАРШРУТ (лінію), щоб пройти через ці точки
+  const rebuiltRoute = await buildRoute(startLngLat, endLngLat, allCoords);
+
+  // Об'єднуємо метадані всіх точок
+  const finalWaypoints = [
+    ...(currentRoute.waypoints || []),
+    ...limitedNewWaypoints
+  ];
+
+  return {
+    ...rebuiltRoute,
+    waypoints: finalWaypoints,
+    name: currentRoute.name,
+    description: currentRoute.description,
+    preferences: currentRoute.preferences
+  };
 }
