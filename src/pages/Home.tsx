@@ -17,7 +17,6 @@ import { saveRoute } from "../services/supabaseService";
 import { buildSavedRouteFromResult, getDefaultRouteName } from "../utils/routeSave";
 import "../styles/home.css";
 
-// Всі доступні категорії фільтрів для додавання нових точок
 const AVAILABLE_CATEGORIES = [
   { id: "park", label: "Парки та природа", emoji: "🌳" },
   { id: "cafe", label: "Кав'ярні", emoji: "☕" },
@@ -58,17 +57,14 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [hasOpenedMenu, setHasOpenedMenu] = useState(false);
   
-  // Збереження маршруту
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [saveDescription, setSaveDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
 
-  // Спеціальні стани для збереженого маршруту (перегляд)
   const [loadedSavedRoute, setLoadedSavedRoute] = useState<any>(null);
   const [isNavigatingToStart, setIsNavigatingToStart] = useState(false);
   
-  // Меню редагування точок
   const [isEditingPois, setIsEditingPois] = useState(false);
   const [reselectCategories, setReselectCategories] = useState<string[]>([]);
 
@@ -80,7 +76,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     return () => cancelAnimationFrame(frameId);
   }, [isActive]);
 
-  // Завантаження маршруту зі сховища (перехід з Favorites)
+  // Завантаження маршруту зі сховища: НАДІЙНО ВИТЯГУЄМО distanceKm ТА steps
   useEffect(() => {
     if (!isActive) return;
     const raw = localStorage.getItem("routeToView");
@@ -90,27 +86,30 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
       const data = JSON.parse(raw);
       if (!data.points?.length || !mapRef.current) return;
 
+      const dist = data.distanceKm ?? data.distance_km ?? data.statistics?.distanceKm ?? 0;
+      const time = data.estimatedTimeMinutes ?? data.statistics?.estimatedTimeMinutes ?? 0;
+      const steps = data.steps ?? data.preferences?.steps ?? [];
+
       const routeData = {
         name: data.name || "Збережений маршрут",
         description: data.description,
         points: data.points,
+        distanceKm: dist,                 
+        estimatedTimeMinutes: time,       
         statistics: {
-          distanceKm: data.distance_km ?? data.statistics?.distanceKm ?? 0,
-          estimatedTimeMinutes: data.statistics?.estimatedTimeMinutes ?? 0,
+          distanceKm: dist,
+          estimatedTimeMinutes: time,
         },
         waypoints: data.waypoints || [],
         preferences: data.preferences,
+        steps: steps                      
       };
 
       (mapRef.current as any).loadSavedRoute(routeData);
       setLoadedSavedRoute(routeData);
       setHasRoute(true);
       
-      if (routeData.statistics.distanceKm) {
-        const km = routeData.statistics.distanceKm;
-        const min = routeData.statistics.estimatedTimeMinutes;
-        setRouteSummary(min ? `${km} км · ~${min} хв` : `${km} км`);
-      }
+      setRouteSummary(time ? `${dist} км · ~${time} хв` : `${dist} км`);
       setSidebarOpen(true);
     } catch (err) {
       console.error("Помилка завантаження routeToView:", err);
@@ -151,7 +150,6 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     setSidebarOpen(true);
   }, []);
 
-  // Оновлена функція отримання геолокації
   const runWithGeolocation = (task: (userLoc: [number, number]) => Promise<void>) => {
     if (!navigator.geolocation) {
       alert("Ваш браузер не підтримує геолокацію.");
@@ -173,7 +171,6 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
         setIsGenerating(false);
         setRouteSummary("");
       },
-      // enableHighAccuracy: false запобігає зависанню і швидше отримує координати
       { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 }
     );
   };
@@ -227,7 +224,6 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     });
   };
 
-  // Прокласти шлях від користувача до точки старту
   const handleNavigateToStart = () => {
     if (!loadedSavedRoute || !mapRef.current) return;
     setIsGenerating(true);
@@ -237,13 +233,14 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
       try {
         const fullRoute = await navigateToSavedRoute(userLoc, loadedSavedRoute);
         
-        // ЗБЕРІГАЄМО в стейт новий, довгий маршрут.
-        // Це важливо: якщо тепер натиснути "Додати точки", вони будуть шукатися вздовж усього шляху!
         setLoadedSavedRoute(fullRoute); 
 
+        // Передаємо абсолютно всі дані (без NaN) в RouteMap
         (mapRef.current as any).loadSavedRoute({
           name: fullRoute.name || "Маршрут",
           points: fullRoute.points,
+          distanceKm: fullRoute.distanceKm,
+          estimatedTimeMinutes: fullRoute.estimatedTimeMinutes,
           statistics: { distanceKm: fullRoute.distanceKm, estimatedTimeMinutes: fullRoute.estimatedTimeMinutes },
           waypoints: fullRoute.waypoints,
           steps: fullRoute.steps,
@@ -268,7 +265,6 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     );
   };
 
-  // Знайти нові POI за обраними категоріями та перебудувати лінію
   const handleFindNewPOIs = async () => {
     if (!loadedSavedRoute || !mapRef.current) return;
     if (reselectCategories.length === 0) {
@@ -282,7 +278,10 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     try {
       const updatedRoute = await rebuildRouteWithNewPois(loadedSavedRoute, reselectCategories);
       
-      (mapRef.current as any).loadSavedRoute(updatedRoute);
+      (mapRef.current as any).loadSavedRoute({
+        ...updatedRoute,
+        statistics: { distanceKm: updatedRoute.distanceKm, estimatedTimeMinutes: updatedRoute.estimatedTimeMinutes }
+      });
       setLoadedSavedRoute(updatedRoute);
       setRouteSummary(`Оновлено! Маршрут перебудовано через нові місця.`);
       setIsEditingPois(false);
@@ -392,7 +391,6 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
                   {isNavigatingToStart ? "Шлях до старту побудовано" : "Пройтись цим маршрутом"}
                 </button>
                 
-                {/* Випадаюче меню для додавання нових точок */}
                 <div>
                   <button 
                     className={`btn w-100 py-2 rounded-3 fw-medium d-flex justify-content-between align-items-center transition-all ${isEditingPois ? 'btn-primary shadow-sm text-white' : 'btn-outline-primary'}`}
@@ -453,7 +451,6 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
               </div>
             </div>
           ) : (
-            /* СТАНДАРТНЕ МЕНЮ ГЕНЕРАЦІЇ */
             <>
               <ul className="nav nav-pills nav-fill mb-2 mb-md-3 bg-white p-1 rounded-3 border">
                 <li className="nav-item">

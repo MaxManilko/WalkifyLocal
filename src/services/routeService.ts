@@ -760,9 +760,20 @@ export async function navigateToSavedRoute(
   const startPoint = savedRoute.points[0];
   const destCoords: [number, number] = [startPoint[1], startPoint[0]];
   
+  // НАДІЙНА ПЕРЕВІРКА І ЗАХИСТ ВІД NaN: 
+  const baseDistance = savedRoute.distanceKm ?? (savedRoute as any).distance_km ?? (savedRoute as any).statistics?.distanceKm ?? 0;
+  const baseTime = savedRoute.estimatedTimeMinutes ?? (savedRoute as any).statistics?.estimatedTimeMinutes ?? 0;
+  const baseSteps = savedRoute.steps ?? (savedRoute as any).preferences?.steps ?? [];
+
   const distToStartKm = getDistanceKm(userLocation, destCoords);
   if (distToStartKm < 0.05) {
-    return savedRoute;
+    // Якщо ми вже на точці старту
+    return {
+      ...savedRoute,
+      distanceKm: baseDistance,
+      estimatedTimeMinutes: baseTime,
+      steps: baseSteps
+    };
   }
   
   const approachRoute = await buildRoute(userLocation, destCoords, []);
@@ -770,9 +781,9 @@ export async function navigateToSavedRoute(
   return {
     ...savedRoute,
     points: [...approachRoute.points, ...savedRoute.points],
-    steps: [...(approachRoute.steps || []), ...(savedRoute.steps || [])],
-    distanceKm: parseFloat((savedRoute.distanceKm + approachRoute.distanceKm).toFixed(2)),
-    estimatedTimeMinutes: savedRoute.estimatedTimeMinutes + approachRoute.estimatedTimeMinutes,
+    steps: [...(approachRoute.steps || []), ...baseSteps],
+    distanceKm: parseFloat((baseDistance + approachRoute.distanceKm).toFixed(2)),
+    estimatedTimeMinutes: baseTime + approachRoute.estimatedTimeMinutes,
     waypoints: savedRoute.waypoints
   };
 }
@@ -801,7 +812,6 @@ export async function reanalyzeRoutePois(
     if (!uniquePois.has(key)) uniquePois.set(key, poi);
   });
 
-  // Рахуємо мінімальну відстань від кожного знайденого місця до лінії маршруту
   const poisWithDistance = Array.from(uniquePois.values()).map(poi => {
     let minDistance = Infinity;
     for (const pt of samplePoints) {
@@ -812,8 +822,6 @@ export async function reanalyzeRoutePois(
   });
 
   const selectedPois: Place[] = [];
-
-//  беремо  1 найближчу точку для кожної категорії
   const maxPerCategory = 1;
 
   for (const category of categories) {
@@ -830,7 +838,6 @@ export async function reanalyzeRoutePois(
     }
   }
 
-  // Якщо фільтрація по типах не спрацювала ідеально, беремо просто найближчі 2 точки
   if (selectedPois.length === 0 && poisWithDistance.length > 0) {
       poisWithDistance.sort((a, b) => a.minDistance - b.minDistance);
       selectedPois.push(...poisWithDistance.slice(0, 1).map(p => p.poi));
