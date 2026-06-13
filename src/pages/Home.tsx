@@ -17,16 +17,25 @@ import { saveRoute } from "../services/supabaseService";
 import { buildSavedRouteFromResult, getDefaultRouteName } from "../utils/routeSave";
 import "../styles/home.css";
 
-// Категорії для меню редагування POI на збереженому маршруті
+// Всі доступні категорії фільтрів для додавання нових точок
 const AVAILABLE_CATEGORIES = [
-  { id: "park", label: "Парки та природа", emoji: "🌳" },
+  { id: "park", label: "Парки", emoji: "🌳" },
+  { id: "natural_feature", label: "Природа та водойми", emoji: "🌊" },
   { id: "cafe", label: "Кав'ярні", emoji: "☕" },
   { id: "restaurant", label: "Ресторани", emoji: "🍽️" },
   { id: "bakery", label: "Пекарні", emoji: "🥐" },
+  { id: "store", label: "Магазини", emoji: "🛍️" },
+  { id: "shopping_mall", label: "Торгові центри", emoji: "🏢" },
   { id: "museum", label: "Музеї", emoji: "🏛️" },
   { id: "art_gallery", label: "Галереї", emoji: "🎨" },
   { id: "tourist_attraction", label: "Визначні місця", emoji: "⭐" },
-  { id: "store", label: "Магазини", emoji: "🛍️" },
+  { id: "church", label: "Храми", emoji: "⛪" },
+  { id: "library", label: "Бібліотеки", emoji: "📚" },
+  { id: "gym", label: "Спортзали", emoji: "🏋️" },
+  { id: "spa", label: "Спа", emoji: "💆" },
+  { id: "movie_theater", label: "Кінотеатри", emoji: "🍿" },
+  { id: "night_club", label: "Клуби / Бари", emoji: "🍸" },
+  { id: "playground", label: "Майданчики", emoji: "🛝" },
 ];
 
 interface HomeProps {
@@ -56,8 +65,10 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
   // Спеціальні стани для збереженого маршруту (перегляд)
   const [loadedSavedRoute, setLoadedSavedRoute] = useState<any>(null);
   const [isNavigatingToStart, setIsNavigatingToStart] = useState(false);
+  
+  // Меню редагування точок
   const [isEditingPois, setIsEditingPois] = useState(false);
-  const [reselectCategories, setReselectCategories] = useState<string[]>(["park", "cafe"]);
+  const [reselectCategories, setReselectCategories] = useState<string[]>([]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -138,24 +149,36 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     setSidebarOpen(true);
   }, []);
 
-  // Обгортка для геолокації з timeout щоб уникнути зависання
+  // Оновлена функція отримання геолокації (Надійніша)
   const runWithGeolocation = (task: (userLoc: [number, number]) => Promise<void>) => {
+    if (!navigator.geolocation) {
+      alert("Ваш браузер не підтримує геолокацію.");
+      setIsGenerating(false);
+      setRouteSummary("");
+      return;
+    }
+
     navigator.geolocation.getCurrentPosition(
       async (position) => {
         const userLoc: [number, number] = [position.coords.longitude, position.coords.latitude];
         await task(userLoc);
       },
       (error) => {
-        alert("Помилка геолокації. Будь ласка, увімкніть GPS або перевірте дозволи.");
+        console.warn("Помилка геолокації:", error.message);
+        let msg = "Помилка геолокації. Будь ласка, увімкніть GPS або перевірте дозволи.";
+        if (error.code === 3) msg = "Час очікування геолокації вичерпано. Перевірте з'єднання.";
+        alert(msg);
         setIsGenerating(false);
         setRouteSummary("");
       },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+      // Пом'якшені налаштування, щоб уникати помилки тайм-ауту (highAccuracy = false)
+      { enableHighAccuracy: false, timeout: 20000, maximumAge: 60000 }
     );
   };
 
   const handleFilterGeneration = async (filterOptions: RouteFilterOptions) => {
     if (!mapRef.current) return;
+
     setIsGenerating(true);
     setSidebarOpen(false);
     setRouteSummary("Шукаємо місця та будуємо маршрут...");
@@ -168,6 +191,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
             ? (destination?.coords ? destination : filterOptions.destination)
             : undefined,
         };
+
         const generatedRoute = await generateRouteByFilters(userLoc, options);
         loadRouteOnMap(generatedRoute);
       } catch (err: any) {
@@ -181,6 +205,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
 
   const handleTextGeneration = async (prefs: { prompt: string; routeMode?: string; duration?: number }) => {
     if (!mapRef.current) return;
+
     setIsGenerating(true);
     setSidebarOpen(false);
     setRouteSummary("Аналізуємо запит...");
@@ -246,21 +271,22 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     }
 
     setIsGenerating(true);
-    setRouteSummary("Аналізуємо лінію маршруту та шукаємо нові цікаві місця...");
+    setRouteSummary("Аналізуємо маршрут та додаємо нові цікаві місця...");
 
     try {
       const newWaypoints = await reanalyzeRoutePois(loadedSavedRoute.points, reselectCategories);
       
       const updatedRoute = {
         ...loadedSavedRoute,
-        // Замінюємо старі точки на нові
-        waypoints: newWaypoints
+        // Додаємо нові точки до вже існуючих
+        waypoints: [...(loadedSavedRoute.waypoints || []), ...newWaypoints]
       };
       
       (mapRef.current as any).loadSavedRoute(updatedRoute);
       setLoadedSavedRoute(updatedRoute);
-      setRouteSummary(`Оновлено! Знайдено ${newWaypoints.length} нових місць на маршруті.`);
+      setRouteSummary(`Оновлено! Знайдено та додано ${newWaypoints.length} нових місць.`);
       setIsEditingPois(false);
+      setReselectCategories([]);
     } catch (err: any) {
       alert("Не вдалося знайти нові місця.");
     } finally {
@@ -366,62 +392,59 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
                   {isNavigatingToStart ? "Шлях до старту побудовано" : "Пройтись цим маршрутом"}
                 </button>
                 
-                {!isEditingPois ? (
+                {/* Випадаюче меню для додавання нових точок */}
+                <div>
                   <button 
-                    className="btn btn-outline-primary py-2 rounded-3 fw-medium d-flex justify-content-center align-items-center"
-                    onClick={() => setIsEditingPois(true)}
+                    className={`btn w-100 py-2 rounded-3 fw-medium d-flex justify-content-between align-items-center transition-all ${isEditingPois ? 'btn-primary shadow-sm text-white' : 'btn-outline-primary'}`}
+                    onClick={() => setIsEditingPois(!isEditingPois)}
                     disabled={isGenerating}
                   >
-                    <i className="bi bi-pencil-square me-2"></i>
-                    Перевибрати точки інтересу
+                    <span><i className="bi bi-geo-alt me-2"></i>Додати точки інтересу</span>
+                    <i className={`bi bi-chevron-${isEditingPois ? 'up' : 'down'}`}></i>
                   </button>
-                ) : (
-                  <div className="border rounded-4 p-3 bg-light shadow-sm">
-                    <label className="form-label small fw-bold text-secondary text-uppercase mb-2">
-                      Що хочеться відвідати?
-                    </label>
-                    <p className="text-muted small mb-3">
-                      Оберіть нові категорії. Ми знайдемо ці місця вздовж збереженого шляху.
-                    </p>
-                    <div className="d-flex flex-wrap gap-2 mb-4">
-                      {AVAILABLE_CATEGORIES.map(cat => {
-                        const isSelected = reselectCategories.includes(cat.id);
-                        return (
-                          <button
-                            key={cat.id}
-                            type="button"
-                            onClick={() => toggleReselectCategory(cat.id)}
-                            className={`btn btn-sm rounded-pill px-3 py-1.5 transition-all ${
-                              isSelected
-                                ? "btn-primary shadow-sm"
-                                : "btn-white border text-secondary"
-                            }`}
-                            style={{ fontSize: "0.85rem", fontWeight: 500 }}
-                          >
-                            <span className="me-1">{cat.emoji}</span> {cat.label}
-                          </button>
-                        );
-                      })}
+                  
+                  {isEditingPois && (
+                    <div className="border border-primary-subtle rounded-4 p-3 bg-light shadow-sm mt-2 animate-fade-in">
+                      <p className="text-muted small mb-3">
+                        Оберіть нові категорії. Ми знайдемо ці місця вздовж збереженого шляху і додамо їх до маршруту.
+                      </p>
+                      
+                      <div className="d-flex flex-wrap gap-2 mb-4" style={{ maxHeight: "250px", overflowY: "auto" }}>
+                        {AVAILABLE_CATEGORIES.map(cat => {
+                          const isSelected = reselectCategories.includes(cat.id);
+                          return (
+                            <button
+                              key={cat.id}
+                              type="button"
+                              onClick={() => toggleReselectCategory(cat.id)}
+                              className={`btn btn-sm rounded-pill px-3 py-1.5 transition-all ${
+                                isSelected
+                                  ? "btn-primary shadow-sm"
+                                  : "btn-white border text-secondary bg-white"
+                              }`}
+                              style={{ fontSize: "0.85rem", fontWeight: 500 }}
+                            >
+                              <span className="me-1">{cat.emoji}</span> {cat.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      
+                      <div className="d-flex gap-2">
+                        <button 
+                          className="btn btn-primary flex-grow-1 rounded-3 fw-medium shadow-sm" 
+                          onClick={handleFindNewPOIs}
+                          disabled={reselectCategories.length === 0 || isGenerating}
+                        >
+                          <i className="bi bi-search me-1"></i> Знайти
+                        </button>
+                      </div>
                     </div>
-                    <div className="d-flex gap-2">
-                      <button 
-                        className="btn btn-primary flex-grow-1 rounded-3 fw-medium" 
-                        onClick={handleFindNewPOIs}
-                      >
-                        <i className="bi bi-search me-1"></i> Знайти
-                      </button>
-                      <button 
-                        className="btn btn-outline-secondary rounded-3" 
-                        onClick={() => setIsEditingPois(false)}
-                      >
-                        Скасувати
-                      </button>
-                    </div>
-                  </div>
-                )}
+                  )}
+                </div>
                 
                 <button 
-                  className="btn btn-light text-danger py-2 rounded-3 mt-2 fw-medium border"
+                  className="btn btn-light text-danger py-2 rounded-3 mt-1 fw-medium border"
                   onClick={handleClearRoute}
                 >
                   <i className="bi bi-x-circle me-2"></i>
