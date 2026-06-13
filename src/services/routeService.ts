@@ -760,15 +760,11 @@ export async function navigateToSavedRoute(
   const startPoint = savedRoute.points[0];
   const destCoords: [number, number] = [startPoint[1], startPoint[0]];
   
-  // ПЕРЕВІРКА: чи ми вже біля старту (радіус 50 метрів)
   const distToStartKm = getDistanceKm(userLocation, destCoords);
   if (distToStartKm < 0.05) {
-    // Не будуємо зайвий шлях, просто повертаємо збережений маршрут,
-    // інакше трекер миттєво порахує його завершеним через 0 дистанцію.
     return savedRoute;
   }
   
-  // Будуємо шлях від користувача до старту маршруту
   const approachRoute = await buildRoute(userLocation, destCoords, []);
   
   return {
@@ -777,7 +773,7 @@ export async function navigateToSavedRoute(
     steps: [...(approachRoute.steps || []), ...(savedRoute.steps || [])],
     distanceKm: parseFloat((savedRoute.distanceKm + approachRoute.distanceKm).toFixed(2)),
     estimatedTimeMinutes: savedRoute.estimatedTimeMinutes + approachRoute.estimatedTimeMinutes,
-    waypoints: savedRoute.waypoints // Зберігаємо старі точки
+    waypoints: savedRoute.waypoints
   };
 }
 
@@ -795,7 +791,6 @@ export async function reanalyzeRoutePois(
   
   for (const point of samplePoints) {
     const lngLatPoint: [number, number] = [point[1], point[0]];
-    // Зменшили радіус до 400м, щоб точки були ТІЛЬКИ вздовж маршруту, а не по всьому місту
     const pois = await searchComprehensivePois(lngLatPoint, categories, 400); 
     allFoundPois.push(...pois);
   }
@@ -806,11 +801,41 @@ export async function reanalyzeRoutePois(
     if (!uniquePois.has(key)) uniquePois.set(key, poi);
   });
 
-  const sortedPois = Array.from(uniquePois.values())
-    .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-    .slice(0, 5); // Беремо топ-5 найкращих місць
+  // Рахуємо мінімальну відстань від кожного знайденого місця до лінії маршруту
+  const poisWithDistance = Array.from(uniquePois.values()).map(poi => {
+    let minDistance = Infinity;
+    for (const pt of samplePoints) {
+      const dist = getDistanceKm([pt[1], pt[0]], poi.coordinates);
+      if (dist < minDistance) minDistance = dist;
+    }
+    return { poi, minDistance };
+  });
 
-  return sortedPois.map(poi => ({
+  const selectedPois: Place[] = [];
+  // Беремо по 1-2 найближчі точки для кожної категорії
+  const maxPerCategory = categories.length > 2 ? 1 : 2;
+
+  for (const category of categories) {
+    const categoryPois = poisWithDistance
+      .filter(p => p.poi.type === category)
+      .sort((a, b) => a.minDistance - b.minDistance);
+
+    const topForCategory = categoryPois.slice(0, maxPerCategory).map(p => p.poi);
+    
+    for (const p of topForCategory) {
+        if (!selectedPois.find(sp => sp.externalId === p.externalId)) {
+            selectedPois.push(p);
+        }
+    }
+  }
+
+  // Якщо фільтрація по типах не спрацювала ідеально, беремо просто найближчі 2 точки
+  if (selectedPois.length === 0 && poisWithDistance.length > 0) {
+      poisWithDistance.sort((a, b) => a.minDistance - b.minDistance);
+      selectedPois.push(...poisWithDistance.slice(0, 2).map(p => p.poi));
+  }
+
+  return selectedPois.map(poi => ({
     location: [poi.coordinates[1], poi.coordinates[0]],
     name: poi.name,
     type: (poi.type || 'custom') as PoiCategory,
@@ -821,26 +846,21 @@ export async function reanalyzeRoutePois(
   }));
 }
 
-// НОВА ФУНКЦІЯ: Не просто знаходить нові точки, але й перебудовує саму лінію, щоб дотягнутися до них.
 export async function rebuildRouteWithNewPois(
   currentRoute: RouteResult,
   categories: string[]
 ): Promise<RouteResult> {
-  // 1. Знаходимо нові місця вздовж лінії
   const newWaypoints = await reanalyzeRoutePois(currentRoute.points, categories);
 
   if (newWaypoints.length === 0) {
     throw new Error("Не знайдено підходящих місць за обраними фільтрами поруч із маршрутом.");
   }
 
-  // Обмежуємо до 4 нових місць, щоб не перевантажувати Google API ліміт (max 10 waypoints)
-  const limitedNewWaypoints = newWaypoints.slice(0, 4);
+  const limitedNewWaypoints = newWaypoints.slice(0, 5);
 
-  // 2. Збираємо координати старих і нових точок
   const existingWaypointsCoords = (currentRoute.waypoints || []).map(wp => [wp.location[1], wp.location[0]] as [number, number]);
   const newWaypointsCoords = limitedNewWaypoints.map(wp => [wp.location[1], wp.location[0]] as [number, number]);
   
-  // Комбінуємо і беремо останні 8, щоб влізти в ліміти API
   const allCoords = [...existingWaypointsCoords, ...newWaypointsCoords].slice(-8);
 
   const startPoint = currentRoute.points[0];
@@ -849,10 +869,8 @@ export async function rebuildRouteWithNewPois(
   const startLngLat: [number, number] = [startPoint[1], startPoint[0]];
   const endLngLat: [number, number] = [endPoint[1], endPoint[0]];
 
-  // 3. ПЕРЕБУДОВУЄМО МАРШРУТ (лінію), щоб пройти через ці точки
   const rebuiltRoute = await buildRoute(startLngLat, endLngLat, allCoords);
 
-  // Об'єднуємо метадані всіх точок
   const finalWaypoints = [
     ...(currentRoute.waypoints || []),
     ...limitedNewWaypoints
