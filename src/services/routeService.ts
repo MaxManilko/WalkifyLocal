@@ -308,8 +308,6 @@ async function buildFinalRoute(
   return route;
 }
 
-// ─── Новий метод: Генерація за фільтрами ────────────────────────────────────────
-
 export async function resolveDestination(
   userLocation: [number, number],
   destination?: RouteDestination
@@ -422,8 +420,6 @@ export async function generateRouteByFilters(
   return route;
 }
 
-// ─── Enhanced POI Discovery & Filtering (Text Mode) ───────────────────────────
-
 export async function searchComprehensivePois(
   center: [number, number], 
   desiredTypes: string[], 
@@ -465,8 +461,6 @@ function filterPoisByDiversity(pois: Place[]): Place[] {
   }
   return diversePois;
 }
-
-// ─── Route Building (Google Directions) ─────────────────────────────────────────
 
 export async function buildRoute(
   userLocation: [number, number], // [lng, lat]
@@ -548,8 +542,6 @@ export async function buildRoute(
     });
   });
 }
-
-// ─── Route Generation Orchestrators (Text Mode) ─────────────────────────────────
 
 export async function generateExplorationRoute(
   userLocation: [number, number], 
@@ -751,63 +743,60 @@ export async function generateRouteFromText(
 
   return route;
 }
-// src/services/routeService.ts
 
-/**
- * Добудовує маршрут від поточного місцезнаходження до старту збереженого маршруту.
- */
+// ─── Збережені маршрути та Пошук POI ────────────────────────────────
+
 export async function navigateToSavedRoute(
   userLocation: [number, number],
   savedRoute: RouteResult
 ): Promise<RouteResult> {
-  if (!savedRoute.points.length) throw new Error("Збережений маршрут не має точок.");
+  if (!savedRoute.points || savedRoute.points.length === 0) {
+    throw new Error("Збережений маршрут не має точок.");
+  }
   
+  // Збережений маршрут має точки у форматі [lat, lng]. 
+  // buildRoute очікує destination у форматі [lng, lat]!
   const startPoint = savedRoute.points[0];
+  const destCoords: [number, number] = [startPoint[1], startPoint[0]];
   
   // Будуємо шлях від користувача до старту маршруту
-  const approachRoute = await buildRoute(userLocation, startPoint, []);
+  const approachRoute = await buildRoute(userLocation, destCoords, []);
   
-  // Об'єднуємо маршрути
   return {
     ...savedRoute,
     points: [...approachRoute.points, ...savedRoute.points],
     steps: [...(approachRoute.steps || []), ...(savedRoute.steps || [])],
     distanceKm: parseFloat((savedRoute.distanceKm + approachRoute.distanceKm).toFixed(2)),
     estimatedTimeMinutes: savedRoute.estimatedTimeMinutes + approachRoute.estimatedTimeMinutes,
-    waypoints: savedRoute.waypoints // Зберігаємо оригінальні точки інтересу
+    waypoints: savedRoute.waypoints
   };
 }
 
-/**
- * Шукає нові точки інтересу (POI) за фільтрами вздовж збереженого шляху.
- */
 export async function reanalyzeRoutePois(
   routePoints: [number, number][],
   categories: string[]
 ): Promise<RouteWaypoint[]> {
-  const newWaypoints: RouteWaypoint[] = [];
-  
-  // Беремо кілька опорних точок з маршруту (наприклад, кожну 50-ту точку, щоб не спамити API)
   const samplePoints = routePoints.filter((_, index) => index % 50 === 0);
   
-  // Додаємо кінець маршруту для певності
-  if (routePoints.length > 0) samplePoints.push(routePoints[routePoints.length - 1]);
+  if (routePoints.length > 0 && !samplePoints.includes(routePoints[routePoints.length - 1])) {
+    samplePoints.push(routePoints[routePoints.length - 1]);
+  }
 
   const allFoundPois: Place[] = [];
   
   for (const point of samplePoints) {
-    const pois = await searchComprehensivePois(point, categories, 1000); // Радіус 1 км від опорної точки
+    // point тут [lat, lng]. searchComprehensivePois очікує [lng, lat]!
+    const lngLatPoint: [number, number] = [point[1], point[0]];
+    const pois = await searchComprehensivePois(lngLatPoint, categories, 1500); 
     allFoundPois.push(...pois);
   }
 
-  // Фільтруємо дублікати
   const uniquePois = new Map<string, Place>();
   allFoundPois.forEach(poi => {
     const key = poi.externalId || poi.name;
     if (!uniquePois.has(key)) uniquePois.set(key, poi);
   });
 
-  // Беремо топ-10 найрейтинговіших або залишаємо всі
   const sortedPois = Array.from(uniquePois.values())
     .sort((a, b) => (b.rating || 0) - (a.rating || 0))
     .slice(0, 10);
@@ -818,6 +807,7 @@ export async function reanalyzeRoutePois(
     type: (poi.type || 'custom') as PoiCategory,
     address: poi.address,
     rating: poi.rating,
-    source: 'google'
+    source: 'google',
+    externalId: poi.externalId
   }));
 }
