@@ -751,3 +751,73 @@ export async function generateRouteFromText(
 
   return route;
 }
+// src/services/routeService.ts
+
+/**
+ * Добудовує маршрут від поточного місцезнаходження до старту збереженого маршруту.
+ */
+export async function navigateToSavedRoute(
+  userLocation: [number, number],
+  savedRoute: RouteResult
+): Promise<RouteResult> {
+  if (!savedRoute.points.length) throw new Error("Збережений маршрут не має точок.");
+  
+  const startPoint = savedRoute.points[0];
+  
+  // Будуємо шлях від користувача до старту маршруту
+  const approachRoute = await buildRoute(userLocation, startPoint, []);
+  
+  // Об'єднуємо маршрути
+  return {
+    ...savedRoute,
+    points: [...approachRoute.points, ...savedRoute.points],
+    steps: [...(approachRoute.steps || []), ...(savedRoute.steps || [])],
+    distanceKm: parseFloat((savedRoute.distanceKm + approachRoute.distanceKm).toFixed(2)),
+    estimatedTimeMinutes: savedRoute.estimatedTimeMinutes + approachRoute.estimatedTimeMinutes,
+    waypoints: savedRoute.waypoints // Зберігаємо оригінальні точки інтересу
+  };
+}
+
+/**
+ * Шукає нові точки інтересу (POI) за фільтрами вздовж збереженого шляху.
+ */
+export async function reanalyzeRoutePois(
+  routePoints: [number, number][],
+  categories: string[]
+): Promise<RouteWaypoint[]> {
+  const newWaypoints: RouteWaypoint[] = [];
+  
+  // Беремо кілька опорних точок з маршруту (наприклад, кожну 50-ту точку, щоб не спамити API)
+  const samplePoints = routePoints.filter((_, index) => index % 50 === 0);
+  
+  // Додаємо кінець маршруту для певності
+  if (routePoints.length > 0) samplePoints.push(routePoints[routePoints.length - 1]);
+
+  const allFoundPois: Place[] = [];
+  
+  for (const point of samplePoints) {
+    const pois = await searchComprehensivePois(point, categories, 1000); // Радіус 1 км від опорної точки
+    allFoundPois.push(...pois);
+  }
+
+  // Фільтруємо дублікати
+  const uniquePois = new Map<string, Place>();
+  allFoundPois.forEach(poi => {
+    const key = poi.externalId || poi.name;
+    if (!uniquePois.has(key)) uniquePois.set(key, poi);
+  });
+
+  // Беремо топ-10 найрейтинговіших або залишаємо всі
+  const sortedPois = Array.from(uniquePois.values())
+    .sort((a, b) => (b.rating || 0) - (a.rating || 0))
+    .slice(0, 10);
+
+  return sortedPois.map(poi => ({
+    location: [poi.coordinates[1], poi.coordinates[0]],
+    name: poi.name,
+    type: (poi.type || 'custom') as PoiCategory,
+    address: poi.address,
+    rating: poi.rating,
+    source: 'google'
+  }));
+}

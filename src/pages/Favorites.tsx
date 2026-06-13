@@ -16,6 +16,7 @@ interface RouteItem {
   created_at: string;
   user_id?: string;
   points?: [number, number][];
+  waypoints?: any[];
 }
 
 const RADIUS_OPTIONS = [10, 25, 50, 100, 200];

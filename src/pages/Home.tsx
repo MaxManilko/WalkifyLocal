@@ -4,7 +4,14 @@ import { useNavigate } from "react-router-dom";
 import RouteMap, { RouteMapRef } from "../Components/RouteMap";
 import WalkPreferences from "../Components/WalkPreferences";
 import WalkFiltersMenu from "../Components/WalkFiltersMenu";
-import { generateRouteByFilters, generateRouteFromText, RouteFilterOptions, RouteDestination } from "../services/routeService";
+import { 
+  generateRouteByFilters, 
+  generateRouteFromText, 
+  RouteFilterOptions, 
+  RouteDestination, 
+  navigateToSavedRoute, 
+  reanalyzeRoutePois 
+} from "../services/routeService";
 import { useAuth } from "../context/AuthContext";
 import { saveRoute } from "../services/supabaseService";
 import { buildSavedRouteFromResult, getDefaultRouteName } from "../utils/routeSave";
@@ -26,11 +33,17 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
   const [destination, setDestination] = useState<RouteDestination | null>(null);
   const [isPickingOnMap, setIsPickingOnMap] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const [hasOpenedMenu, setHasOpenedMenu] = useState(false); // Стан для відслідковування першого відкриття
+  const [hasOpenedMenu, setHasOpenedMenu] = useState(false);
+  
+  // Збереження маршруту
   const [showSaveModal, setShowSaveModal] = useState(false);
   const [saveName, setSaveName] = useState("");
   const [saveDescription, setSaveDescription] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  // Спеціальні стани для збереженого маршруту (перегляд)
+  const [loadedSavedRoute, setLoadedSavedRoute] = useState<any>(null);
+  const [isNavigatingToStart, setIsNavigatingToStart] = useState(false);
 
   useEffect(() => {
     if (!isActive) return;
@@ -40,6 +53,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     return () => cancelAnimationFrame(frameId);
   }, [isActive]);
 
+  // Завантаження маршруту зі сховища (перехід з Favorites)
   useEffect(() => {
     if (!isActive) return;
     const raw = localStorage.getItem("routeToView");
@@ -49,7 +63,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
       const data = JSON.parse(raw);
       if (!data.points?.length || !mapRef.current) return;
 
-      mapRef.current.loadSavedRoute({
+      const routeData = {
         name: data.name || "Збережений маршрут",
         description: data.description,
         points: data.points,
@@ -59,15 +73,20 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
         },
         waypoints: data.waypoints || [],
         preferences: data.preferences,
-      });
+      };
+
+      (mapRef.current as any).loadSavedRoute(routeData);
+      setLoadedSavedRoute(routeData);
       setHasRoute(true);
-      if (data.distance_km || data.statistics?.distanceKm) {
-        const km = data.distance_km ?? data.statistics?.distanceKm;
-        const min = data.statistics?.estimatedTimeMinutes;
+      
+      if (routeData.statistics.distanceKm) {
+        const km = routeData.statistics.distanceKm;
+        const min = routeData.statistics.estimatedTimeMinutes;
         setRouteSummary(min ? `${km} км · ~${min} хв` : `${km} км`);
       }
+      setSidebarOpen(true);
     } catch (err) {
-      console.error("routeToView:", err);
+      console.error("Помилка завантаження routeToView:", err);
     } finally {
       localStorage.removeItem("routeToView");
     }
@@ -112,7 +131,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
         await task(userLoc);
       },
       () => {
-        alert("Будь ласка, увімкніть геолокацію в браузері.");
+        alert("Будь ласка, увімкніть геолокацію в браузері для прокладання маршрутів.");
         setIsGenerating(false);
         setRouteSummary("");
       }
@@ -168,6 +187,60 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     });
   };
 
+  // Обробник: Прокласти шлях від користувача до точки старту збереженого маршруту
+  const handleNavigateToStart = () => {
+    if (!loadedSavedRoute || !mapRef.current) return;
+    setIsGenerating(true);
+    setRouteSummary("Будуємо маршрут до початку...");
+
+    runWithGeolocation(async (userLoc) => {
+      try {
+        const fullRoute = await navigateToSavedRoute(userLoc, loadedSavedRoute);
+        
+        (mapRef.current as any).loadSavedRoute({
+          name: loadedSavedRoute.name,
+          points: fullRoute.points,
+          statistics: { distanceKm: fullRoute.distanceKm, estimatedTimeMinutes: fullRoute.estimatedTimeMinutes },
+          waypoints: fullRoute.waypoints,
+          steps: fullRoute.steps,
+          preferences: loadedSavedRoute.preferences
+        });
+        
+        setIsNavigatingToStart(true);
+        setRouteSummary(`Загалом: ${fullRoute.distanceKm} км · ~${fullRoute.estimatedTimeMinutes} хв`);
+        setSidebarOpen(true);
+      } catch (err: any) {
+        alert(err.message || "Помилка побудови маршруту до початку.");
+        setRouteSummary("");
+      } finally {
+        setIsGenerating(false);
+      }
+    });
+  };
+
+  // Обробник: Знайти нові POI вздовж вже завантаженого маршруту
+  const handleFindNewPOIs = async () => {
+    if (!loadedSavedRoute || !mapRef.current) return;
+    setIsGenerating(true);
+    setRouteSummary("Шукаємо нові цікаві місця...");
+
+    try {
+      const newWaypoints = await reanalyzeRoutePois(loadedSavedRoute.points, ['cafe', 'park', 'tourist_attraction']);
+      const updatedRoute = {
+        ...loadedSavedRoute,
+        waypoints: [...(loadedSavedRoute.waypoints || []), ...newWaypoints]
+      };
+      
+      (mapRef.current as any).loadSavedRoute(updatedRoute);
+      setLoadedSavedRoute(updatedRoute);
+      setRouteSummary("Нові місця додано на карту!");
+    } catch (err: any) {
+      alert("Не вдалося знайти нові місця.");
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
   const handleRouteSummary = useCallback((sum: string) => {
     setRouteSummary(sum);
     setHasRoute(true);
@@ -177,6 +250,8 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     mapRef.current?.clearCurrentRoute();
     setRouteSummary("");
     setHasRoute(false);
+    setLoadedSavedRoute(null);
+    setIsNavigatingToStart(false);
   };
 
   const handleOpenSaveModal = () => {
@@ -205,7 +280,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
     try {
       await saveRoute(buildSavedRouteFromResult(route, saveName, saveDescription));
       setShowSaveModal(false);
-      alert("Маршрут збережено! Переглянути можна у вкладці Routes.");
+      alert("Маршрут збережено! Переглянути можна у вкладці Улюблені.");
     } catch (err) {
       console.error(err);
       alert("Не вдалося зберегти маршрут. Спробуйте ще раз.");
@@ -216,6 +291,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
 
   return (
     <div className="container-fluid p-0 position-relative home-layout">
+      {/* Оверлей завантаження */}
       {isGenerating && (
         <div className="home-generating-overlay" role="status" aria-live="polite">
           <div className="spinner-border text-success" style={{ width: '2.5rem', height: '2.5rem' }} />
@@ -223,6 +299,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
         </div>
       )}
 
+      {/* Затемнення фону на мобільних при відкритому сайдбарі */}
       <div
         className={`home-sidebar-backdrop ${sidebarOpen && !isPickingOnMap ? 'visible' : ''}`}
         onClick={() => setSidebarOpen(false)}
@@ -230,10 +307,11 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
       />
 
       <div className="row g-0 h-100">
+        
+        {/* Сайдбар */}
         <div
           className={`col-12 col-md-4 p-2 p-md-3 bg-light border-end overflow-y-auto home-sidebar ${sidebarOpen ? 'open' : ''} ${isPickingOnMap ? 'd-none' : ''}`}
         >
-          {/* Шапка сайдбару з кнопкою закриття для мобільних пристроїв */}
           <div className="d-flex justify-content-between align-items-center mb-3 d-md-none px-1">
             <h6 className="m-0 fw-bold text-success">
               <i className="bi bi-sliders me-2"></i>Параметри прогулянки
@@ -246,54 +324,95 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
             </button>
           </div>
 
-          <ul className="nav nav-pills nav-fill mb-2 mb-md-3 bg-white p-1 rounded-3 border">
-            <li className="nav-item">
-              <button
-                className={`nav-link rounded-2 fw-semibold py-2 ${activeTab === "filters" ? "active bg-success text-white" : "text-secondary"}`}
-                onClick={() => setActiveTab("filters")}
-              >
-                <i className="bi bi-sliders me-1"></i> Фільтри
-              </button>
-            </li>
-            <li className="nav-item">
-              <button
-                className={`nav-link rounded-2 fw-semibold py-2 ${activeTab === "text" ? "active bg-success text-white" : "text-secondary"}`}
-                onClick={() => setActiveTab("text")}
-              >
-                <i className="bi bi-chat-left-text me-1"></i> Текст
-              </button>
-            </li>
-          </ul>
-
-          {activeTab === "filters" ? (
-            <WalkFiltersMenu
-              onGenerate={handleFilterGeneration}
-              isGenerating={isGenerating}
-              destination={destination}
-              onDestinationChange={setDestination}
-              onPickOnMap={handlePickOnMap}
-            />
+          {loadedSavedRoute ? (
+            /* МЕНЮ ДЛЯ ЗБЕРЕЖЕНОГО МАРШРУТУ */
+            <div className="card shadow-sm border-0 rounded-4 p-4 bg-white mb-3">
+              <h5 className="fw-bold mb-3 text-dark">
+                <i className="bi bi-map me-2 text-primary"></i> Збережений маршрут
+              </h5>
+              <h6 className="text-secondary mb-4">{loadedSavedRoute.name}</h6>
+              
+              <div className="d-grid gap-3">
+                <button 
+                  className="btn btn-success py-2 rounded-3 shadow-sm fw-medium"
+                  onClick={handleNavigateToStart}
+                  disabled={isGenerating || isNavigatingToStart}
+                >
+                  <i className="bi bi-person-walking me-2"></i>
+                  {isNavigatingToStart ? "Шлях побудовано" : "Пройтись цим маршрутом"}
+                </button>
+                
+                <button 
+                  className="btn btn-outline-primary py-2 rounded-3 fw-medium"
+                  onClick={handleFindNewPOIs}
+                  disabled={isGenerating}
+                >
+                  <i className="bi bi-search me-2"></i>
+                  Знайти нові місця поруч
+                </button>
+                
+                <button 
+                  className="btn btn-light text-danger py-2 rounded-3 mt-2 fw-medium"
+                  onClick={handleClearRoute}
+                >
+                  <i className="bi bi-x-circle me-2"></i>
+                  Закрити маршрут
+                </button>
+              </div>
+            </div>
           ) : (
-            <WalkPreferences
-              onGenerate={handleTextGeneration}
-              isGenerating={isGenerating}
-              onRequestGeolocation={() => mapRef.current?.requestGeolocation()}
-              routeSummary={routeSummary}
-              hasRoute={hasRoute}
-              onClearRoute={handleClearRoute}
-            />
+            /* СТАНДАРТНЕ МЕНЮ ГЕНЕРАЦІЇ */
+            <>
+              <ul className="nav nav-pills nav-fill mb-2 mb-md-3 bg-white p-1 rounded-3 border">
+                <li className="nav-item">
+                  <button
+                    className={`nav-link rounded-2 fw-semibold py-2 ${activeTab === "filters" ? "active bg-success text-white" : "text-secondary"}`}
+                    onClick={() => setActiveTab("filters")}
+                  >
+                    <i className="bi bi-sliders me-1"></i> Фільтри
+                  </button>
+                </li>
+                <li className="nav-item">
+                  <button
+                    className={`nav-link rounded-2 fw-semibold py-2 ${activeTab === "text" ? "active bg-success text-white" : "text-secondary"}`}
+                    onClick={() => setActiveTab("text")}
+                  >
+                    <i className="bi bi-chat-left-text me-1"></i> Текст
+                  </button>
+                </li>
+              </ul>
+
+              {activeTab === "filters" ? (
+                <WalkFiltersMenu
+                  onGenerate={handleFilterGeneration}
+                  isGenerating={isGenerating}
+                  destination={destination}
+                  onDestinationChange={setDestination}
+                  onPickOnMap={handlePickOnMap}
+                />
+              ) : (
+                <WalkPreferences
+                  onGenerate={handleTextGeneration}
+                  isGenerating={isGenerating}
+                  onRequestGeolocation={() => mapRef.current?.requestGeolocation()}
+                  routeSummary={routeSummary}
+                  hasRoute={hasRoute}
+                  onClearRoute={handleClearRoute}
+                />
+              )}
+            </>
           )}
 
+          {/* Інформація про дистанцію та час */}
           {routeSummary && sidebarOpen && (
-            <div className="alert alert-info mt-2 mt-md-3 border-0 rounded-3 small shadow-sm mb-2">
+            <div className="alert alert-info mt-2 mt-md-3 border-0 rounded-3 small shadow-sm mb-2 fw-medium text-center">
               <i className="bi bi-info-circle me-2"></i> {routeSummary}
             </div>
           )}
-
         </div>
 
+        {/* Карта */}
         <div className={`col-12 col-md-8 position-relative h-100 home-map-col ${isPickingOnMap ? 'fullscreen-pick' : ''}`}>
-          {/* Нова динамічна кнопка відкриття меню */}
           {!isPickingOnMap && (
             <button
               type="button"
@@ -317,7 +436,7 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
             ref={mapRef}
             onRouteSummary={handleRouteSummary}
             routeSummary={!sidebarOpen && !isPickingOnMap ? routeSummary : undefined}
-            showSaveButton={hasRoute && !isPickingOnMap}
+            showSaveButton={hasRoute && !isPickingOnMap && !loadedSavedRoute}
             onSaveRoute={handleOpenSaveModal}
             hideMapControls={sidebarOpen || isGenerating || isPickingOnMap}
             pickDestinationMode={isPickingOnMap}
@@ -327,42 +446,46 @@ const Home: React.FC<HomeProps> = ({ isActive = true }) => {
         </div>
       </div>
 
+      {/* Модальне вікно збереження маршруту */}
       <Modal show={showSaveModal} onHide={() => setShowSaveModal(false)} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>Зберегти маршрут</Modal.Title>
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold"><i className="bi bi-bookmark-heart text-danger me-2"></i>Зберегти маршрут</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           <Form.Group className="mb-3">
-            <Form.Label>Назва</Form.Label>
+            <Form.Label className="fw-medium text-secondary small">Назва</Form.Label>
             <Form.Control
               value={saveName}
               onChange={(e) => setSaveName(e.target.value)}
               placeholder="Назва маршруту"
               maxLength={120}
+              className="rounded-3"
             />
           </Form.Group>
           <Form.Group>
-            <Form.Label>Опис (необовʼязково)</Form.Label>
+            <Form.Label className="fw-medium text-secondary small">Опис (необовʼязково)</Form.Label>
             <Form.Control
               as="textarea"
-              rows={2}
+              rows={3}
               value={saveDescription}
               onChange={(e) => setSaveDescription(e.target.value)}
-              placeholder="Короткий опис прогулянки"
+              placeholder="Короткий опис прогулянки..."
               maxLength={500}
+              className="rounded-3"
             />
           </Form.Group>
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="outline-secondary" onClick={() => setShowSaveModal(false)}>
+        <Modal.Footer className="border-0 pt-0">
+          <Button variant="light" onClick={() => setShowSaveModal(false)} className="rounded-3 fw-medium text-secondary">
             Скасувати
           </Button>
           <Button
             variant="success"
             onClick={handleSaveRoute}
             disabled={isSaving || !saveName.trim()}
+            className="rounded-3 fw-medium px-4"
           >
-            {isSaving ? "Збереження..." : "Зберегти"}
+            {isSaving ? "Збереження..." : "Зберегти маршрут"}
           </Button>
         </Modal.Footer>
       </Modal>
