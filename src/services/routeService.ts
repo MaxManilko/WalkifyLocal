@@ -812,8 +812,9 @@ export async function reanalyzeRoutePois(
   });
 
   const selectedPois: Place[] = [];
-  // Беремо по 1-2 найближчі точки для кожної категорії
-  const maxPerCategory = categories.length > 2 ? 1 : 2;
+
+//  беремо  1 найближчу точку для кожної категорії
+  const maxPerCategory = 1;
 
   for (const category of categories) {
     const categoryPois = poisWithDistance
