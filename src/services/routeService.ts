@@ -81,7 +81,6 @@ const EXTENDED_POI_TYPES = [
   'tourist_attraction', 'point_of_interest', 'church', 'natural_feature'
 ];
 
-// РОЗШИРЕНИЙ СЛОВНИК (додано відмінки, щоб генератор розумів "з місцем", "кав'ярнею" тощо)
 export const PLACE_TYPE_MAPPING: Record<string, string> = {
   'парк': 'park', 'парки': 'park', 'парком': 'park', 'парку': 'park',
   'кав\'ярня': 'cafe', 'кав\'ярні': 'cafe', 'кав\'ярню': 'cafe', 'кав\'ярнею': 'cafe',
@@ -585,7 +584,6 @@ function extractCategoriesInOrder(text: string): string[] {
     .map(f => f.type);
 }
 
-// ─── Оновлений парсер (розуміє відмінки та "з", "і", "та") ────────────────────
 export function parseRouteRequest(text: string): ParsedRouteRequest {
   const lowerText = text.toLowerCase().trim();
   const categories = extractCategoriesInOrder(text);
@@ -595,6 +593,7 @@ export function parseRouteRequest(text: string): ParsedRouteRequest {
   const waypointNames: string[] = [];
   const waypointTypes: string[] = [];
 
+  // Шукаємо "до / в / на"
   const destMatch = text.match(
     /(?:до|в|на)\s+([А-Яа-яІіЇїЄєҐґA-Za-z0-9][А-Яа-яІіЇїЄєҐґA-Za-z0-9\s\-'']{2,}?)(?=\s+(?:через|з|із|за|і|та|,)|$)/i
   );
@@ -608,6 +607,7 @@ export function parseRouteRequest(text: string): ParsedRouteRequest {
     }
   }
 
+  // Шукаємо "через / повз"
   const throughMatches = text.matchAll(
     /(?:через|повз)\s+([А-Яа-яІіЇїЄєҐґA-Za-z0-9][А-Яа-яІіЇїЄєҐґA-Za-z0-9\s\-'']*)/gi
   );
@@ -621,14 +621,19 @@ export function parseRouteRequest(text: string): ParsedRouteRequest {
     }
   }
 
-  // Додано "та", "і", "й" щоб парсер розумів перелічення ("через парк і визначне місце")
+  // Шукаємо "з / із / та / і / й" — ДОДАНО capture власних назв!
   const withMatches = text.matchAll(
-    /(?:з|із|та|і|й)\s+([а-яіїєґa-z][а-яіїєґa-z\s\-'']+)/gi
+    /(?:з|із|та|і|й)\s+([А-Яа-яІіЇїЄєҐґA-Za-z0-9][А-Яа-яІіЇїЄєҐґA-Za-z0-9\s\-'']*)/gi
   );
   for (const match of withMatches) {
     const segment = match[1].trim().toLowerCase();
     const typeEntry = Object.entries(PLACE_TYPE_MAPPING).find(([key]) => segment.includes(key));
-    if (typeEntry) waypointTypes.push(typeEntry[1]);
+    if (typeEntry) {
+      waypointTypes.push(typeEntry[1]);
+    } else if (segment.length >= 3) {
+      // Ось цього рядка не вистачало. Тепер "Сільпо" збережеться сюди!
+      waypointNames.push(match[1].trim());
+    }
   }
 
   const isExplorationMode =
@@ -681,14 +686,21 @@ export async function generateRouteFromText(
   );
 
   if (routeMode === 'exploration') {
-    if (visitCategories.length === 0) {
-      throw new Error('Вкажіть, що хочете відвідати (парк, кав\'ярня, музей тощо).');
+    if (visitCategories.length === 0 && parsed.waypointNames.length === 0) {
+      throw new Error('Вкажіть, що хочете відвідати (парк, кав\'ярня, або власна назва місця).');
     }
-    return generateRouteByFilters(userLocation, {
-      routeMode: 'exploration',
-      categories: visitCategories,
-      targetTimeMinutes: parsed.targetTimeMinutes,
-    });
+    
+    // Якщо користувач вказав тільки назву ("прогулянка через сільпо") без категорій,
+    // система повинна обробити це, змінивши логіку або використовуючи point-to-point з поверненням
+    if (visitCategories.length === 0 && parsed.waypointNames.length > 0) {
+      // Тимчасово делегуємо це в логіку нижче
+    } else {
+      return generateRouteByFilters(userLocation, {
+        routeMode: 'exploration',
+        categories: visitCategories,
+        targetTimeMinutes: parsed.targetTimeMinutes,
+      });
+    }
   }
 
   let destination: Place | null = null;
@@ -700,17 +712,23 @@ export async function generateRouteFromText(
     destination = pickBestRatedPlace(pois, userLocation);
   }
 
-  if (!destination) {
-    throw new Error('Не вдалося знайти пункт призначення. Уточніть адресу або назву місця.');
-  }
-
   const namedWaypoints: Place[] = [];
   for (const wName of parsed.waypointNames) {
     const wp = await findPlaceByName(wName, userLocation);
     if (wp) namedWaypoints.push(wp);
   }
 
-  const categoryWaypoints = visitCategories.length > 0
+  // Якщо немає пункту призначення, але є проміжні точки (наприклад, "прогулянка через сільпо")
+  if (!destination) {
+     if (namedWaypoints.length > 0) {
+        // Беремо останню вказану точку як пункт призначення
+        destination = namedWaypoints.pop() || null;
+     } else {
+        throw new Error('Не вдалося знайти пункт призначення або розпізнати місця.');
+     }
+  }
+
+  const categoryWaypoints = visitCategories.length > 0 && destination
     ? await findSequentialWaypoints(userLocation, {
         categories: visitCategories,
         targetTimeMinutes: parsed.targetTimeMinutes,
@@ -720,6 +738,11 @@ export async function generateRouteFromText(
     : [];
 
   const allWaypoints = [...namedWaypoints, ...categoryWaypoints];
+  
+  if (!destination) {
+      throw new Error('Не вдалося визначити маршрут. Уточніть адресу або назву місця.');
+  }
+
   const route = await buildFinalRoute(userLocation, destination.coordinates, allWaypoints);
 
   route.waypoints.push({
