@@ -81,47 +81,35 @@ const EXTENDED_POI_TYPES = [
   'tourist_attraction', 'point_of_interest', 'church', 'natural_feature'
 ];
 
+// РОЗШИРЕНИЙ СЛОВНИК (додано відмінки, щоб генератор розумів "з місцем", "кав'ярнею" тощо)
 export const PLACE_TYPE_MAPPING: Record<string, string> = {
-  'парк': 'park',
-  'парки': 'park',
-  'кав\'ярня': 'cafe',
-  'кав\'ярні': 'cafe',
+  'парк': 'park', 'парки': 'park', 'парком': 'park', 'парку': 'park',
+  'кав\'ярня': 'cafe', 'кав\'ярні': 'cafe', 'кав\'ярню': 'cafe', 'кав\'ярнею': 'cafe',
   'кафе': 'cafe',
-  'ресторан': 'restaurant',
-  'ресторани': 'restaurant',
-  'пекарня': 'bakery',
-  'пекарні': 'bakery',
-  'музей': 'museum',
-  'музеї': 'museum',
-  'галерея': 'art_gallery',
-  'галереї': 'art_gallery',
-  'бібліотека': 'library',
-  'бібліотеки': 'library',
-  'книгарня': 'book_store',
-  'книгарні': 'book_store',
-  'церква': 'church',
-  'храм': 'church',
-  'храми': 'church',
-  'визначне місце': 'tourist_attraction',
-  'визначні місця': 'tourist_attraction',
-  'пам\'ятка': 'tourist_attraction',
-  'магазин': 'store',
-  'магазини': 'store',
-  'торговий центр': 'shopping_mall',
-  'тц': 'shopping_mall',
-  'спортзал': 'gym',
-  'зал': 'gym',
+  'ресторан': 'restaurant', 'ресторани': 'restaurant', 'рестораном': 'restaurant', 'ресторану': 'restaurant',
+  'пекарня': 'bakery', 'пекарні': 'bakery', 'пекарню': 'bakery', 'пекарнею': 'bakery',
+  'музей': 'museum', 'музеї': 'museum', 'музеєм': 'museum', 'музею': 'museum',
+  'галерея': 'art_gallery', 'галереї': 'art_gallery', 'галерею': 'art_gallery', 'галереєю': 'art_gallery',
+  'бібліотека': 'library', 'бібліотеки': 'library', 'бібліотеку': 'library', 'бібліотекою': 'library',
+  'книгарня': 'book_store', 'книгарні': 'book_store', 'книгарню': 'book_store', 'книгарнею': 'book_store',
+  'церква': 'church', 'церкву': 'church', 'церквою': 'church',
+  'храм': 'church', 'храми': 'church', 'храмом': 'church', 'храму': 'church',
+  'визначне місце': 'tourist_attraction', 'визначні місця': 'tourist_attraction', 'визначним місцем': 'tourist_attraction', 'визначного місця': 'tourist_attraction',
+  'пам\'ятка': 'tourist_attraction', 'пам\'ятки': 'tourist_attraction', 'пам\'ятку': 'tourist_attraction', 'пам\'яткою': 'tourist_attraction',
+  'магазин': 'store', 'магазини': 'store', 'магазином': 'store', 'магазину': 'store',
+  'торговий центр': 'shopping_mall', 'тц': 'shopping_mall',
+  'спортзал': 'gym', 'зал': 'gym', 'залом': 'gym', 'залу': 'gym',
   'спа': 'spa',
-  'зоопарк': 'zoo',
-  'стадіон': 'stadium',
-  'кінотеатр': 'movie_theater',
-  'бар': 'night_club',
-  'клуб': 'night_club',
-  'майданчик': 'playground',
-  'пляж': 'natural_feature',
-  'озеро': 'natural_feature',
-  'річка': 'natural_feature',
-  'природа': 'natural_feature',
+  'зоопарк': 'zoo', 'зоопарком': 'zoo', 'зоопарку': 'zoo',
+  'стадіон': 'stadium', 'стадіоном': 'stadium', 'стадіону': 'stadium',
+  'кінотеатр': 'movie_theater', 'кінотеатром': 'movie_theater', 'кінотеатру': 'movie_theater',
+  'бар': 'night_club', 'баром': 'night_club', 'бару': 'night_club',
+  'клуб': 'night_club', 'клубом': 'night_club', 'клубу': 'night_club',
+  'майданчик': 'playground', 'майданчиком': 'playground', 'майданчику': 'playground',
+  'пляж': 'natural_feature', 'пляжем': 'natural_feature', 'пляжу': 'natural_feature',
+  'озеро': 'natural_feature', 'озера': 'natural_feature', 'озером': 'natural_feature',
+  'річка': 'natural_feature', 'річки': 'natural_feature', 'річку': 'natural_feature', 'річкою': 'natural_feature',
+  'природа': 'natural_feature', 'природи': 'natural_feature', 'природу': 'natural_feature', 'природою': 'natural_feature',
 };
 
 // ─── Google Maps API Wrappers ───────────────────────────────────────────────────
@@ -597,6 +585,7 @@ function extractCategoriesInOrder(text: string): string[] {
     .map(f => f.type);
 }
 
+// ─── Оновлений парсер (розуміє відмінки та "з", "і", "та") ────────────────────
 export function parseRouteRequest(text: string): ParsedRouteRequest {
   const lowerText = text.toLowerCase().trim();
   const categories = extractCategoriesInOrder(text);
@@ -620,7 +609,7 @@ export function parseRouteRequest(text: string): ParsedRouteRequest {
   }
 
   const throughMatches = text.matchAll(
-    /через\s+([А-Яа-яІіЇїЄєҐґA-Za-z0-9][А-Яа-яІіЇїЄєҐґA-Za-z0-9\s\-'']*)/gi
+    /(?:через|повз)\s+([А-Яа-яІіЇїЄєҐґA-Za-z0-9][А-Яа-яІіЇїЄєҐґA-Za-z0-9\s\-'']*)/gi
   );
   for (const match of throughMatches) {
     const segment = match[1].trim().toLowerCase();
@@ -632,8 +621,9 @@ export function parseRouteRequest(text: string): ParsedRouteRequest {
     }
   }
 
+  // Додано "та", "і", "й" щоб парсер розумів перелічення ("через парк і визначне місце")
   const withMatches = text.matchAll(
-    /(?:з|із)\s+([а-яіїєґa-z][а-яіїєґa-z\s\-'']+)/gi
+    /(?:з|із|та|і|й)\s+([а-яіїєґa-z][а-яіїєґa-z\s\-'']+)/gi
   );
   for (const match of withMatches) {
     const segment = match[1].trim().toLowerCase();
@@ -760,14 +750,12 @@ export async function navigateToSavedRoute(
   const startPoint = savedRoute.points[0];
   const destCoords: [number, number] = [startPoint[1], startPoint[0]];
   
-  // НАДІЙНА ПЕРЕВІРКА І ЗАХИСТ ВІД NaN: 
   const baseDistance = savedRoute.distanceKm ?? (savedRoute as any).distance_km ?? (savedRoute as any).statistics?.distanceKm ?? 0;
   const baseTime = savedRoute.estimatedTimeMinutes ?? (savedRoute as any).statistics?.estimatedTimeMinutes ?? 0;
   const baseSteps = savedRoute.steps ?? (savedRoute as any).preferences?.steps ?? [];
 
   const distToStartKm = getDistanceKm(userLocation, destCoords);
   if (distToStartKm < 0.05) {
-    // Якщо ми вже на точці старту
     return {
       ...savedRoute,
       distanceKm: baseDistance,
